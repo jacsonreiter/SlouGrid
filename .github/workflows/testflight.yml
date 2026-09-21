@@ -74,6 +74,13 @@ jobs:
           head -n 1 "$API_KEY_PATH"
           tail -n 1 "$API_KEY_PATH"
 
+      # O projeto usa CODE_SIGN_STYLE=Automatic sem CODE_SIGN_IDENTITY
+      # explícito em nenhuma configuração, então o Xcode cai no padrão do
+      # SDK iphoneos ("iPhone Developer") mesmo em Release/Archive. Isso
+      # fazia o archive falhar procurando um certificado de Desenvolvimento
+      # que nunca foi importado (só o de Distribuição existe no keychain
+      # deste runner). Forçar "Apple Distribution" aqui resolve sem precisar
+      # mexer no pbxproj (que o Xcode local do usuário também usa).
       - name: Archive
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
@@ -88,7 +95,8 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "$API_KEY_PATH" \
             -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID"
+            -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
       # exportArchive com destination=upload no ExportOptions.plist exporta
       # E envia pro App Store Connect num passo só.
