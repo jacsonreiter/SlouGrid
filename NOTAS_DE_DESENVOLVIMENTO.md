@@ -265,7 +265,30 @@ O usuário jogou pouco depois de ler o resumo e pediu 2 ajustes finos:
   tinha Defesa investida no sistema anterior perde esse investimento (só
   relevante para heróis de teste criados durante esta sessão).
 
-## Deploy: GitHub + TestFlight (sessão separada, em aberto — RETOMAR DAQUI)
+## Deploy: GitHub + TestFlight — RESOLVIDO (sessão seguinte)
+
+O 401 documentado abaixo não era mais o problema real nesta sessão (a
+autenticação da API Key já funcionava sozinha, por motivo não confirmado —
+possivelmente a chave nova gerada pelo usuário, sugerida no fim da seção
+anterior, propagou). A causa real, descoberta lendo os logs reais do GitHub
+Actions run a run: `CODE_SIGN_STYLE = Automatic` sem `CODE_SIGN_IDENTITY`
+explícito faz o Xcode sempre exigir um certificado de **Desenvolvimento**
+no passo de Archive — é assim que a assinatura automática da Apple
+funciona, distribuição só entra no passo de export — mas só havia
+certificado de Distribuição importado no keychain do CI. Forçar
+`CODE_SIGN_IDENTITY=Apple Distribution` sem mudar o estilo gerou outro erro
+("conflicting provisioning settings"). Corrigido trocando só o passo de
+Archive pra assinatura **manual** (`CODE_SIGN_STYLE=Manual` +
+`CODE_SIGN_IDENTITY=Apple Distribution` + `PROVISIONING_PROFILE=<UUID
+extraído do .mobileprovision importado>`), sem negociar nada com a Apple
+nesse passo — o Export continua automático com a API Key, já que
+`-exportArchive` com method `app-store-connect` não tem ambiguidade sobre
+precisar de Distribuição. Validado disparando o workflow direto na branch
+via API do GitHub e lendo os logs a cada tentativa, até um run passar de
+ponta a ponta com "Upload succeeded" no App Store Connect. PR:
+https://github.com/jacsonreiter/SlouGrid/pull/1.
+
+## Deploy: GitHub + TestFlight (histórico da sessão anterior, já resolvido acima)
 
 Pedido do usuário: colocar o projeto no GitHub e conseguir enviar pro
 TestFlight/App Store. Isso é sobre infraestrutura de build/publicação, não
@@ -389,6 +412,53 @@ rodar de novo.
 3. Uma vez o Archive funcionar, o próximo passo (`Export and upload`) usa
    as mesmas credenciais — se o Archive passar, é provável que o upload
    também passe, mas ainda não foi testado nem uma vez com sucesso.
+
+## Sessão de melhorias pós-TestFlight (combate + exploração)
+
+Depois do deploy resolvido, o usuário pediu pra continuar puxando
+referências de Elden Ring e melhorar as áreas de exploração especificamente.
+
+- **Bug corrigido: Defesa do inimigo nunca era usada em combate.** O campo
+  `Inimigo.defesa` (calculado em `Zona.swift` pra todo inimigo/chefe) nunca
+  era lido em `TelaDeCombate.atacar()`/`lancarMagia()` — todo inimigo tinha
+  defesa efetiva zero, só a força dele importava. Corrigido subtraindo
+  `inimigo.defesa` do dano final nos dois pontos (dano básico e dano de
+  magia/Golpe de Arma, que reaproveita `lancarMagia`), espelhando como a
+  Defesa do herói já funcionava em `Personagem.sofrerDano`. Veneno (dano por
+  turno) continua ignorando defesa de propósito, como sangramento/veneno em
+  Elden Ring. **Isso deixa os combates (principalmente chefes, cuja defesa
+  escala mais rápido: `4 + nível*2` vs `1 + nível` do comum) mais difíceis
+  do que qualquer sensação prévia — primeira coisa a sentir jogando.**
+- **Sistema de exploração com variedade** (`Zona.sortearEncontro()`,
+  `TipoDeEncontro`): botão "Explorar" agora sorteia entre 3 resultados,
+  estilo o mapa aberto de Elden Ring — 80% inimigo comum (como antes), 8%
+  inimigo de **Elite** (`Zona.gerarInimigoDeElite`: um "field boss" — vida
+  ×1.6, força ×1.3, +3 defesa, recompensa ×2.2/×2 — sem contar pra vitórias
+  do chefe nem dar Grande Rúnica), 12% **Descoberta** pacífica
+  (`Personagem.receberDescoberta`: Runas + chance de item, sem combate
+  nenhum, tipo um cadáver ou baú achado no caminho). Como uma Descoberta nem
+  abre a tela de combate, `TelaDeMasmorras` teve que trocar o botão
+  "Explorar" de `NavigationLink` estático pra `Button` +
+  `.navigationDestination(item:)` (o sorteio acontece antes de navegar) — um
+  novo tipo `EncontroPendente` guarda a zona + se é elite; a Descoberta
+  mostra um `.alert` na hora, sem navegar. "Desafiar Chefe" continua
+  `NavigationLink` normal (determinístico, não precisa desse fluxo).
+- Nenhum arquivo novo foi criado (só editados os existentes), então não
+  precisou mexer no `project.pbxproj` (ver aviso técnico sobre isso mais
+  abaixo).
+- Validado só lendo o código com cuidado — **sem Xcode/simulador neste
+  ambiente** (container Linux, `swiftc`/`xcodebuild` não existem aqui). A
+  validação real veio de disparar o workflow de TestFlight (que faz um
+  `xcodebuild archive` de verdade num runner macOS) depois dessas mudanças —
+  ver resultado no PR #1. Ainda assim, **nenhum playtest humano** dessas
+  mudanças específicas foi feito.
+- Ideias discutidas mas não implementadas ainda, se quiser continuar nessa
+  linha: infusões/afinidades de arma (trocar o atributo de escala de uma
+  arma via um item consumível, tipo pedra de reforço), Spirit Ashes
+  (invocação que luta junto — provavelmente grande demais pro combate 1v1
+  atual), pontos de interesse temáticos por zona (textos de descoberta
+  únicos por lugar em vez de genéricos), pequenos "field bosses" com nomes
+  próprios (não só "<Inimigo> de Elite") pra ganhar mais personalidade.
 
 ## Ainda não feito / ideias em aberto
 

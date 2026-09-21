@@ -1,7 +1,20 @@
 import SwiftUI
 
+// O que "Explorar" te leva a enfrentar — decidido antes de navegar, pois um
+// dos resultados (descoberta) nem entra na tela de combate.
+struct EncontroPendente: Identifiable, Hashable {
+    let id = UUID()
+    let zona: Zona
+    let elite: Bool
+
+    static func == (lhs: EncontroPendente, rhs: EncontroPendente) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
 struct TelaDeMasmorras: View {
     @EnvironmentObject var vm: GameViewModel
+    @State private var encontroPendente: EncontroPendente?
+    @State private var mensagemDeDescoberta: String?
 
     var body: some View {
         ScrollView {
@@ -32,6 +45,38 @@ struct TelaDeMasmorras: View {
             .padding()
         }
         .navigationTitle("Masmorras")
+        .navigationDestination(item: $encontroPendente) { encontro in
+            TelaDeCombate(zona: encontro.zona, contraChefe: false, nivelHeroi: vm.heroi.nivel, elite: encontro.elite)
+        }
+        .alert("Descoberta!", isPresented: Binding(
+            get: { mensagemDeDescoberta != nil },
+            set: { mostrando in if !mostrando { mensagemDeDescoberta = nil } }
+        )) {
+            Button("OK") { mensagemDeDescoberta = nil }
+        } message: {
+            Text(mensagemDeDescoberta ?? "")
+        }
+    }
+
+    // Como no mapa aberto de Elden Ring: a maior parte das explorações leva
+    // a um combate comum, mas às vezes rende um inimigo de elite (mais
+    // forte, mais recompensa) ou uma descoberta pacífica (sem combate).
+    // Rolado aqui, antes de navegar, porque uma descoberta nem abre a tela
+    // de combate.
+    func iniciarExploracao(_ zona: Zona) {
+        switch zona.sortearEncontro() {
+        case .comum:
+            encontroPendente = EncontroPendente(zona: zona, elite: false)
+        case .eliteDeCampo:
+            encontroPendente = EncontroPendente(zona: zona, elite: true)
+        case .descoberta:
+            let recompensa = vm.heroi.receberDescoberta(nivelZona: zona.nivelBaseInimigos)
+            var texto = "Você encontrou \(recompensa.runas) Runas explorando \(zona.nome), sem cruzar com nenhum inimigo."
+            if let item = recompensa.item {
+                texto += " Também achou: \(item.nome)!"
+            }
+            mensagemDeDescoberta = texto
+        }
     }
 
     // MARK: - Faixas de nível
@@ -88,7 +133,9 @@ struct TelaDeMasmorras: View {
                     .foregroundColor(.secondary)
 
                 HStack {
-                    NavigationLink(destination: TelaDeCombate(zona: zona, contraChefe: false, nivelHeroi: vm.heroi.nivel)) {
+                    Button {
+                        iniciarExploracao(zona)
+                    } label: {
                         Text("Explorar")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)

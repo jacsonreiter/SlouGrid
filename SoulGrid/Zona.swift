@@ -48,6 +48,42 @@ struct Zona: Identifiable {
             zonaOrigem: nome
         )
     }
+
+    // Um inimigo comum "inflado" para servir de field boss — mais vida,
+    // força e defesa que o normal da zona, com recompensa maior, mas sem
+    // contar pra vitórias do chefe nem dar Grande Rúnica.
+    func gerarInimigoDeElite(nivelHeroi: Int) -> Inimigo {
+        var inimigo = gerarInimigoComum(nivelHeroi: nivelHeroi)
+        inimigo.nome = "\(inimigo.nome) de Elite"
+        inimigo.vidaMaxima = Int(Double(inimigo.vidaMaxima) * 1.6)
+        inimigo.vidaAtual = inimigo.vidaMaxima
+        inimigo.forca = Int(Double(inimigo.forca) * 1.3)
+        inimigo.defesa += 3
+        inimigo.xpRecompensa = Int(Double(inimigo.xpRecompensa) * 2.2)
+        inimigo.ouroRecompensa = (inimigo.ouroRecompensa.lowerBound * 2)...(inimigo.ouroRecompensa.upperBound * 2)
+        inimigo.elite = true
+        return inimigo
+    }
+}
+
+// O que a exploração de uma zona pode render, estilo o mapa aberto de Elden
+// Ring: na maior parte das vezes um inimigo comum, às vezes um "field boss"
+// de elite (mais forte, loot melhor), e ocasionalmente uma descoberta
+// pacífica — Runas/item de graça, sem risco de combate, como um cadáver ou
+// baú escondido no caminho.
+enum TipoDeEncontro {
+    case comum
+    case eliteDeCampo
+    case descoberta
+}
+
+extension Zona {
+    func sortearEncontro() -> TipoDeEncontro {
+        let rolagem = Int.random(in: 1...100)
+        if rolagem <= 8 { return .eliteDeCampo }
+        if rolagem <= 20 { return .descoberta }
+        return .comum
+    }
 }
 
 // 4 faixas de nível (mesmos degraus de raridade de `Item.lootAleatorio`:

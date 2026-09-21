@@ -567,9 +567,9 @@ struct Personagem: Codable {
         ouro += runasGanhas
 
         var itemGanho: Item? = nil
-        let chanceDeLoot = min(100, (inimigo.chefe ? 100 : 35) + bonusChanceDeItemTotal)
+        let chanceDeLoot = min(100, (inimigo.chefe ? 100 : (inimigo.elite ? 70 : 35)) + bonusChanceDeItemTotal)
         if Int.random(in: 1...100) <= chanceDeLoot {
-            let item = Item.lootAleatorio(nivelInimigo: inimigo.nivel, garantido: inimigo.chefe, bonusRaridade: bonusRaridadeDeItemTotal, classe: classe)
+            let item = Item.lootAleatorio(nivelInimigo: inimigo.nivel, garantido: inimigo.chefe || inimigo.elite, bonusRaridade: bonusRaridadeDeItemTotal, classe: classe)
             adicionarItem(item)
             itemGanho = item
         }
@@ -582,6 +582,26 @@ struct Personagem: Codable {
 
         registrarVitoria(naZona: inimigo.zonaOrigem)
         return (runasGanhas, itemGanho, novaRunica)
+    }
+
+    // Um achado pacífico durante a exploração — um cadáver caído, um baú
+    // escondido — sem combate, estilo os itens espalhados pelo mapa aberto
+    // de Elden Ring. Recompensa menor que vencer um inimigo, mas de graça.
+    mutating func receberDescoberta(nivelZona: Int) -> (runas: Int, item: Item?) {
+        var runasGanhas = Int.random(in: (4 + nivelZona)...(9 + nivelZona * 2))
+        if bonusOuroPercentualTotal > 0 {
+            runasGanhas += runasGanhas * bonusOuroPercentualTotal / 100
+        }
+        ouro += runasGanhas
+
+        var itemGanho: Item? = nil
+        let chanceDeItem = min(100, 40 + bonusChanceDeItemTotal)
+        if Int.random(in: 1...100) <= chanceDeItem {
+            let item = Item.lootAleatorio(nivelInimigo: nivelZona, bonusRaridade: bonusRaridadeDeItemTotal, classe: classe)
+            adicionarItem(item)
+            itemGanho = item
+        }
+        return (runasGanhas, itemGanho)
     }
 
     // MARK: - Mercado e mochila

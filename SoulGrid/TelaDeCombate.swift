@@ -7,6 +7,7 @@ struct TelaDeCombate: View {
 
     let zona: Zona
     let contraChefe: Bool
+    let elite: Bool
 
     @State private var inimigo: Inimigo
     @State private var log: [String] = []
@@ -30,12 +31,13 @@ struct TelaDeCombate: View {
     @State private var bonusAgilidadeTemporaria = 0
     @State private var turnosDeBonusAgilidade = 0
 
-    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int) {
+    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int, elite: Bool = false) {
         self.zona = zona
         self.contraChefe = contraChefe
+        self.elite = elite
         _inimigo = State(initialValue: contraChefe
             ? zona.gerarChefe(nivelHeroi: nivelHeroi)
-            : zona.gerarInimigoComum(nivelHeroi: nivelHeroi))
+            : (elite ? zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi) : zona.gerarInimigoComum(nivelHeroi: nivelHeroi)))
     }
 
     var body: some View {
@@ -71,10 +73,10 @@ struct TelaDeCombate: View {
             HStack {
                 Image(systemName: inimigo.icone)
                     .font(.system(size: 40))
-                    .foregroundColor(inimigo.chefe ? .red : .primary)
+                    .foregroundColor(inimigo.chefe ? .red : (inimigo.elite ? .orange : .primary))
                 VStack(alignment: .leading) {
                     Text(inimigo.nome).font(.title3).fontWeight(.bold)
-                    Text("Nível \(inimigo.nivel)\(inimigo.chefe ? " · Chefe" : "")")
+                    Text("Nível \(inimigo.nivel)\(inimigo.chefe ? " · Chefe" : (inimigo.elite ? " · Elite" : ""))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -99,7 +101,7 @@ struct TelaDeCombate: View {
                 .foregroundColor(.secondary)
         }
         .padding()
-        .background(inimigo.chefe ? Color.red.opacity(0.1) : Color.gray.opacity(0.1))
+        .background(inimigo.chefe ? Color.red.opacity(0.1) : (inimigo.elite ? Color.orange.opacity(0.1) : Color.gray.opacity(0.1)))
         .cornerRadius(12)
     }
 
@@ -390,8 +392,13 @@ struct TelaDeCombate: View {
     // MARK: - Lógica de combate
 
     private func iniciarSeNecessario() {
-        if log.isEmpty {
-            log.append(inimigo.chefe ? "O chefe \(inimigo.nome) apareceu!" : "\(inimigo.nome) apareceu!")
+        guard log.isEmpty else { return }
+        if inimigo.chefe {
+            log.append("O chefe \(inimigo.nome) apareceu!")
+        } else if inimigo.elite {
+            log.append("Um inimigo de elite, \(inimigo.nome), apareceu! Ele é mais forte que o normal da zona — cuidado.")
+        } else {
+            log.append("\(inimigo.nome) apareceu!")
         }
     }
 
@@ -409,10 +416,13 @@ struct TelaDeCombate: View {
             return
         }
         let resultado = vm.heroi.calcularDanoBasico(bonusForca: bonusForcaTemporario)
-        inimigo.vidaAtual = max(0, inimigo.vidaAtual - resultado.dano)
+        // A Defesa do inimigo (ver `Zona.swift`) mitiga o golpe, espelhando
+        // como a Defesa do herói já funciona em `Personagem.sofrerDano`.
+        let danoFinal = max(1, resultado.dano - inimigo.defesa)
+        inimigo.vidaAtual = max(0, inimigo.vidaAtual - danoFinal)
         log.append(resultado.critico
-            ? "Você acertou um golpe crítico! -\(resultado.dano) de vida no \(inimigo.nome)."
-            : "Você atacou o \(inimigo.nome) causando \(resultado.dano) de dano.")
+            ? "Você acertou um golpe crítico! -\(danoFinal) de vida no \(inimigo.nome)."
+            : "Você atacou o \(inimigo.nome) causando \(danoFinal) de dano.")
         UIImpactFeedbackGenerator(style: resultado.critico ? .heavy : .medium).impactOccurred()
 
         if !inimigo.estaVivo {
@@ -482,7 +492,11 @@ struct TelaDeCombate: View {
         case .agilidade: atributoBase = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
         }
 
-        let dano = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
+        let danoBruto = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
+        // Mesma mitigação de Defesa do ataque básico (ver `atacar()`) — o
+        // veneno/dano por turno logo abaixo fica de fora de propósito,
+        // como o sangramento/veneno de Elden Ring, que ignora a armadura.
+        let dano = max(1, danoBruto - inimigo.defesa)
         inimigo.vidaAtual = max(0, inimigo.vidaAtual - dano)
         var texto = "Você usou \(magia.nome) e causou \(dano) de dano!"
 
