@@ -1,19 +1,15 @@
 import SwiftUI
 
-// O que "Explorar" te leva a enfrentar — decidido antes de navegar, pois um
-// dos resultados (descoberta) nem entra na tela de combate.
-struct EncontroPendente: Identifiable, Hashable {
-    let id = UUID()
-    let zona: Zona
-    let elite: Bool
-
-    static func == (lhs: EncontroPendente, rhs: EncontroPendente) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
-
 struct TelaDeMasmorras: View {
     @EnvironmentObject var vm: GameViewModel
-    @State private var encontroPendente: EncontroPendente?
+    // O que "Explorar" rendeu — decidido antes de navegar, pois um dos
+    // resultados (descoberta) nem entra na tela de combate. Usa o padrão
+    // de NavigationLink oculto + `isActive` (em vez de
+    // `navigationDestination(item:)`, que só existe a partir do iOS 17 —
+    // este projeto mira iOS 16.2).
+    @State private var zonaParaExplorar: Zona?
+    @State private var eliteParaExplorar = false
+    @State private var navegandoParaExploracao = false
     @State private var mensagemDeDescoberta: String?
 
     var body: some View {
@@ -45,9 +41,16 @@ struct TelaDeMasmorras: View {
             .padding()
         }
         .navigationTitle("Masmorras")
-        .navigationDestination(item: $encontroPendente) { encontro in
-            TelaDeCombate(zona: encontro.zona, contraChefe: false, nivelHeroi: vm.heroi.nivel, elite: encontro.elite)
-        }
+        .background(
+            Group {
+                if let zona = zonaParaExplorar {
+                    NavigationLink(
+                        destination: TelaDeCombate(zona: zona, contraChefe: false, nivelHeroi: vm.heroi.nivel, elite: eliteParaExplorar),
+                        isActive: $navegandoParaExploracao
+                    ) { EmptyView() }
+                }
+            }
+        )
         .alert("Descoberta!", isPresented: Binding(
             get: { mensagemDeDescoberta != nil },
             set: { mostrando in if !mostrando { mensagemDeDescoberta = nil } }
@@ -66,9 +69,13 @@ struct TelaDeMasmorras: View {
     func iniciarExploracao(_ zona: Zona) {
         switch zona.sortearEncontro() {
         case .comum:
-            encontroPendente = EncontroPendente(zona: zona, elite: false)
+            zonaParaExplorar = zona
+            eliteParaExplorar = false
+            navegandoParaExploracao = true
         case .eliteDeCampo:
-            encontroPendente = EncontroPendente(zona: zona, elite: true)
+            zonaParaExplorar = zona
+            eliteParaExplorar = true
+            navegandoParaExploracao = true
         case .descoberta:
             let recompensa = vm.heroi.receberDescoberta(nivelZona: zona.nivelBaseInimigos)
             var texto = "Você encontrou \(recompensa.runas) Runas explorando \(zona.nome), sem cruzar com nenhum inimigo."
