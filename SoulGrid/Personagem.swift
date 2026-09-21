@@ -28,14 +28,15 @@ struct Personagem: Codable {
     var energiaAtual: Int
     var energiaMaximaBase: Int
     // Chamado de "Runas" na UI (estilo Elden Ring): a mesma moeda compra no
-    // mercado E paga cada ponto de atributo comprado (`comprarPonto`) — não
-    // são duas moedas separadas. O nome do campo continua `ouro` só para não
-    // precisar migrar saves antigos.
+    // mercado E paga cada ponto de atributo alocado (`confirmarEvolucao`) —
+    // não são duas moedas separadas. O nome do campo continua `ouro` só para
+    // não precisar migrar saves antigos.
     var ouro: Int = 0
-    // Nível é derivado, não guardado: cada 5 pontos de atributo comprados
-    // (qualquer combinação, ver `comprarPonto`) rendem +1 nível — a mesma
-    // curva de progressão de antes (evoluir dava 5 pontos por nível), só que
-    // sem o passo intermediário de "evoluir" separado de "gastar o ponto".
+    // Nível é derivado, não guardado: cada 5 pontos de atributo confirmados
+    // (qualquer combinação, ver `confirmarEvolucao`) rendem +1 nível — a
+    // mesma curva de progressão de antes (evoluir dava 5 pontos por nível),
+    // só que sem o passo intermediário de "evoluir" separado de "gastar o
+    // ponto".
     var pontosTotaisComprados: Int = 0
     var nivel: Int {
         1 + pontosTotaisComprados / 5
@@ -382,13 +383,41 @@ struct Personagem: Codable {
         energiaMaximaBase = novaEnergiaMaximaBase
     }
 
-    // Custo em Runas do próximo ponto de um atributo — estilo Elden Ring:
-    // você escolhe o atributo, vê o custo (que sobe conforme o atributo já
-    // investido cresce, a cada 10 pontos) e compra ali mesmo, sem um passo
-    // de "evoluir" separado de "gastar o ponto". O soft cap incentiva builds
-    // pensadas em vez de jogar tudo num atributo só.
-    static func custoEmRunas(valorAtual: Int) -> Int {
-        (1 + valorAtual / 10) * 20
+    // Custo em Runas do próximo ponto — estilo Elden Ring de verdade: o
+    // preço depende de quantos pontos você já tem NO TOTAL (ou seja, do seu
+    // nível), nunca de qual atributo está sendo melhorado. Custa exatamente
+    // o mesmo comprar o 1º ponto de Força ou o 1º ponto de Sorte no mesmo
+    // nível — e o mesmo pra investir tudo numa coisa só ou espalhar. A
+    // escolha de onde investir é só sobre a build, nunca sobre "qual tá mais
+    // barato agora" (esse soft cap por atributo existia antes; não existe
+    // mais, de propósito).
+    static func custoEmRunas(pontosTotaisComprados: Int) -> Int {
+        (1 + pontosTotaisComprados / 10) * 20
+    }
+
+    // Custo do próximo ponto considerando pontos já alocados nesta sessão de
+    // evolução, ainda não confirmados — cada um sobe o "nível provisório",
+    // então o seguinte já sai mais caro, exatamente como no menu de nível de
+    // Elden Ring antes de apertar Confirmar.
+    func custoDoProximoPonto(pontosPendentes: Int) -> Int {
+        Personagem.custoEmRunas(pontosTotaisComprados: pontosTotaisComprados + pontosPendentes)
+    }
+
+    // Custo total pra confirmar N pontos pendentes de uma vez — soma o custo
+    // de cada um, um de cada vez, já que cada ponto encarece o próximo.
+    func custoTotal(pontosPendentes: Int) -> Int {
+        guard pontosPendentes > 0 else { return 0 }
+        var total = 0
+        for i in 0..<pontosPendentes {
+            total += custoDoProximoPonto(pontosPendentes: i)
+        }
+        return total
+    }
+
+    // Nível que o personagem teria após confirmar N pontos pendentes — pra
+    // pré-visualizar "Nível X → Y" antes de gastar as Runas de verdade.
+    func nivelPrevisto(comPontosPendentes pontosPendentes: Int) -> Int {
+        1 + (pontosTotaisComprados + pontosPendentes) / 5
     }
 
     func valor(de atributo: AtributoPrimario) -> Int {
@@ -415,31 +444,33 @@ struct Personagem: Codable {
         }
     }
 
-    func custoEmRunas(de atributo: AtributoPrimario) -> Int {
-        Personagem.custoEmRunas(valorAtual: valor(de: atributo))
-    }
-
-    // Compra 1 ponto num atributo, pagando Runas diretamente — a mesma
-    // moeda do mercado, então melhorar um atributo sempre compete com
-    // comprar equipamento. Cada ponto comprado (em qualquer atributo) conta
-    // pro nível (ver `pontosTotaisComprados`).
-    mutating func comprarPonto(em atributo: AtributoPrimario) -> String {
-        let custo = custoEmRunas(de: atributo)
+    // Aplica de uma vez todos os pontos alocados numa sessão de evolução e
+    // paga o custo total — exatamente como apertar "Confirmar" no menu de
+    // nível de Elden Ring. É tudo ou nada: se faltarem Runas pro total, nada
+    // é gasto nem alterado (o jogador ajusta a alocação e tenta de novo).
+    mutating func confirmarEvolucao(_ alocacoes: [AtributoPrimario: Int]) -> String {
+        let totalDePontos = alocacoes.values.reduce(0, +)
+        guard totalDePontos > 0 else {
+            return "Nenhum ponto alocado ainda."
+        }
+        let custo = custoTotal(pontosPendentes: totalDePontos)
         guard ouro >= custo else {
-            return "Runas insuficientes! Melhorar \(atributo.rawValue) custa \(custo) Runas."
+            return "Runas insuficientes! Confirmar essa evolução custaria \(custo) Runas."
         }
         ouro -= custo
-        switch atributo {
-        case .forca: forca += 1
-        case .vitalidade: vitalidade += 1
-        case .inteligencia: inteligencia += 1
-        case .destreza: destreza += 1
-        case .agilidade: agilidade += 1
-        case .sorte: sorte += 1
+        for (atributo, pontos) in alocacoes where pontos > 0 {
+            switch atributo {
+            case .forca: forca += pontos
+            case .vitalidade: vitalidade += pontos
+            case .inteligencia: inteligencia += pontos
+            case .destreza: destreza += pontos
+            case .agilidade: agilidade += pontos
+            case .sorte: sorte += pontos
+            }
         }
-        pontosTotaisComprados += 1
+        pontosTotaisComprados += totalDePontos
         recalcularMaximos()
-        return "\(atributo.rawValue) +1! (Nível \(nivel))"
+        return "Evolução confirmada! +\(totalDePontos) \(totalDePontos == 1 ? "ponto" : "pontos"), agora nível \(nivel)."
     }
 
     // Descansar é o "Site of Grace" do SoulGrid: recupera vida/energia,

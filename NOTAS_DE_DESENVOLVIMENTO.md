@@ -460,6 +460,41 @@ referências de Elden Ring e melhorar as áreas de exploração especificamente.
   únicos por lugar em vez de genéricos), pequenos "field bosses" com nomes
   próprios (não só "<Inimigo> de Elite") pra ganhar mais personalidade.
 
+## Sistema de evolução virou "menu de nível" de verdade (sessão seguinte)
+
+Pedido do usuário: o sistema de evoluir devia funcionar **igual** ao menu de
+nível de Elden Ring — aloca pontos em vários atributos, o custo sobe
+conforme o nível geral (não por atributo), e só gasta Runas de verdade ao
+confirmar. A versão anterior (`comprarPonto`) comprava 1 ponto por vez,
+na hora, com custo por atributo individual (soft cap tipo Ragnarok Online)
+— não era isso que o usuário queria.
+
+- `Personagem.custoEmRunas(valorAtual:)` (por atributo) foi substituído por
+  `custoEmRunas(pontosTotaisComprados:)` — o custo do próximo ponto depende
+  só de quantos pontos o personagem já tem no total (proxy do nível), nunca
+  de qual atributo está sendo melhorado. Concentrar tudo numa coisa só
+  custa exatamente o mesmo que espalhar — é assim que funciona no jogo de
+  referência (o soft cap por atributo que existia antes foi removido de
+  propósito).
+- `comprarPonto(em:)` (compra imediata, 1 por vez) foi substituído por
+  `confirmarEvolucao(_ alocacoes: [AtributoPrimario: Int])` — aplica vários
+  pontos de uma vez e cobra o custo total (soma do custo de cada ponto,
+  incrementando o "nível provisório" a cada um). Tudo ou nada: sem Runas
+  suficientes pro total, nada é alterado.
+- Novos helpers: `custoDoProximoPonto(pontosPendentes:)`,
+  `custoTotal(pontosPendentes:)`, `nivelPrevisto(comPontosPendentes:)` — pra
+  UI pré-visualizar custo/nível antes de confirmar.
+- `TelaDeEquipamento` ganhou `@State private var alocacoes: [AtributoPrimario: Int]`
+  — estado local, não persistido (sair da tela sem confirmar descarta a
+  alocação sem custo, igual sair do menu de nível sem confirmar no jogo de
+  referência). Cada linha de atributo agora tem botões "-"/"+" que só
+  ajustam a alocação pendente (mostrada em laranja ao lado do valor base e
+  do bônus de equipamento); uma caixa de confirmação aparece só quando há
+  pontos pendentes, mostrando pontos alocados, "Nível X → Y" previsto, custo
+  total, e os botões Confirmar/Cancelar.
+- Validado só lendo o código com cuidado — sem Xcode/simulador neste
+  ambiente. **Ainda não jogado** com essa versão.
+
 ## Ainda não feito / ideias em aberto
 
 - **Nenhum playtest real** dos números foi feito — tudo é estimativa

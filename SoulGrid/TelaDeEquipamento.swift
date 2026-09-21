@@ -5,6 +5,13 @@ import SwiftUI
 struct TelaDeEquipamento: View {
     @EnvironmentObject var vm: GameViewModel
     @State private var mensagem = ""
+    // Pontos alocados nesta sessão de evolução, ainda não pagos nem
+    // aplicados — o "menu de nível" de Elden Ring: você distribui à vontade
+    // entre os atributos, vê o custo total subir, e só quando aperta
+    // Confirmar é que as Runas saem de verdade e o nível sobe. Sair da tela
+    // sem confirmar descarta a alocação, sem custo nenhum — como sair do
+    // menu de nível sem confirmar no jogo de referência.
+    @State private var alocacoes: [AtributoPrimario: Int] = [:]
 
     var body: some View {
         ScrollView {
@@ -35,10 +42,26 @@ struct TelaDeEquipamento: View {
 
     // MARK: - Atributos
 
-    // Estilo Elden Ring: escolha o atributo, veja o custo em Runas daquele
-    // ponto (sobe conforme o atributo já cresceu) e toque em "+" pra comprar
-    // na hora — sem um passo separado de "evoluir" antes de gastar. Cada
-    // ponto comprado (em qualquer atributo) também sobe o nível.
+    // Quantos pontos estão alocados (pendentes, não confirmados) no total.
+    var totalDePontosAlocados: Int {
+        alocacoes.values.reduce(0, +)
+    }
+
+    // Custo em Runas pra confirmar a alocação pendente inteira de uma vez —
+    // sobe conforme mais pontos são alocados nesta sessão, não conforme
+    // qual atributo é escolhido (ver `Personagem.custoTotal`).
+    var custoDaAlocacao: Int {
+        vm.heroi.custoTotal(pontosPendentes: totalDePontosAlocados)
+    }
+
+    var podeConfirmarEvolucao: Bool {
+        totalDePontosAlocados > 0 && vm.heroi.ouro >= custoDaAlocacao
+    }
+
+    // Estilo o menu de nível de Elden Ring: aloque pontos à vontade entre os
+    // atributos (o custo depende só de quantos pontos você já alocou no
+    // total, não de qual atributo), veja o custo total e o nível resultante,
+    // e confirme pra gastar as Runas e aplicar tudo de uma vez.
     var atributosBox: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -56,6 +79,10 @@ struct TelaDeEquipamento: View {
 
             ForEach(AtributoPrimario.allCases, id: \.self) { atributo in
                 linhaDeAtributoDistribuivel(atributo)
+            }
+
+            if totalDePontosAlocados > 0 {
+                confirmacaoDeEvolucaoBox
             }
 
             Divider().padding(.vertical, 2)
@@ -100,41 +127,98 @@ struct TelaDeEquipamento: View {
         }
     }
 
-    // Mostra o valor base do personagem, o quanto o equipamento contribui, e
-    // um botão que já mostra o custo em Runas do próximo ponto (sobe
-    // conforme o atributo cresce) e compra na hora ao tocar.
+    // Mostra o valor base do personagem, o bônus de equipamento, e quanto
+    // está alocado nesta sessão (ainda pendente) — com botões "-"/"+" pra
+    // ajustar a alocação. Nada é gasto até confirmar (ver `confirmacaoDeEvolucaoBox`).
     func linhaDeAtributoDistribuivel(_ atributo: AtributoPrimario) -> some View {
         let (icone, cor) = iconeDoAtributo(atributo)
         let base = vm.heroi.valor(de: atributo)
-        let total = vm.heroi.totalDe(atributo)
-        let custo = vm.heroi.custoEmRunas(de: atributo)
-        let podeComprar = vm.heroi.ouro >= custo
+        let bonusEquipamento = vm.heroi.totalDe(atributo) - base
+        let pendente = alocacoes[atributo] ?? 0
+        let totalComPendente = base + pendente + bonusEquipamento
+        let podeAlocarMais = vm.heroi.ouro >= vm.heroi.custoTotal(pontosPendentes: totalDePontosAlocados + 1)
 
         return HStack {
             Label(atributo.rawValue, systemImage: icone)
                 .foregroundColor(cor)
             Spacer()
-            if total != base {
+            Group {
                 Text("\(base) ")
                     .foregroundColor(.secondary)
-                + Text("+\(total - base) ")
-                    .foregroundColor(.green)
-                + Text("= \(total)")
-                    .fontWeight(.semibold)
-            } else {
-                Text("\(total)")
+                if pendente > 0 {
+                    Text("+\(pendente) ")
+                        .foregroundColor(.orange)
+                }
+                if bonusEquipamento != 0 {
+                    Text("+\(bonusEquipamento) ")
+                        .foregroundColor(.green)
+                }
+                Text("= \(totalComPendente)")
                     .fontWeight(.semibold)
             }
-            Button {
-                mensagem = vm.heroi.comprarPonto(em: atributo)
-            } label: {
-                Label("\(custo) Runas", systemImage: "plus.circle.fill")
-                    .font(.caption2)
+            .font(.subheadline)
+
+            HStack(spacing: 4) {
+                Button {
+                    alocacoes[atributo] = max(0, pendente - 1)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                }
+                .disabled(pendente <= 0)
+                .foregroundColor(pendente > 0 ? .red : .gray)
+
+                Button {
+                    alocacoes[atributo, default: 0] += 1
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                }
+                .disabled(!podeAlocarMais)
+                .foregroundColor(podeAlocarMais ? .green : .gray)
             }
-            .disabled(!podeComprar)
-            .foregroundColor(podeComprar ? .green : .gray)
+            .font(.title3)
         }
         .font(.subheadline)
+    }
+
+    // Barra de confirmação: aparece só quando há pontos pendentes — mostra
+    // o custo total, o nível que você teria depois, e os botões pra
+    // confirmar (gasta as Runas e aplica tudo) ou cancelar (descarta, sem
+    // custo nenhum).
+    var confirmacaoDeEvolucaoBox: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("\(totalDePontosAlocados) \(totalDePontosAlocados == 1 ? "ponto alocado" : "pontos alocados")")
+                    .font(.caption)
+                Spacer()
+                Text("Nível \(vm.heroi.nivel) → \(vm.heroi.nivelPrevisto(comPontosPendentes: totalDePontosAlocados))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+            }
+            HStack {
+                Text("Custo total: \(custoDaAlocacao) Runas")
+                    .font(.caption)
+                    .foregroundColor(vm.heroi.ouro >= custoDaAlocacao ? .secondary : .red)
+                Spacer()
+                Button("Cancelar") {
+                    alocacoes = [:]
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+                Button("Confirmar") {
+                    mensagem = vm.heroi.confirmarEvolucao(alocacoes)
+                    alocacoes = [:]
+                }
+                .font(.caption)
+                .fontWeight(.bold)
+                .disabled(!podeConfirmarEvolucao)
+                .foregroundColor(podeConfirmarEvolucao ? .green : .gray)
+            }
+        }
+        .padding(8)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(8)
     }
 
     func linhaDeAtributoDerivado(_ nome: String, valor: Int, icone: String, cor: Color, sufixo: String = "") -> some View {
