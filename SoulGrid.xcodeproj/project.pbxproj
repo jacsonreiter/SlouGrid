@@ -1,0 +1,406 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		844C15E42FE38FF500A2E5D6 /* TelaDoMercado.swift in Sources */ = {isa = PBXBuildFile; fileRef = 844C15E32FE38FF500A2E5D6 /* TelaDoMercado.swift */; };
+		84B099BC2FE2D73C004C8D0F /* SoulGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099BB2FE2D73C004C8D0F /* SoulGridApp.swift */; };
+		84B099BE2FE2D73C004C8D0F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099BD2FE2D73C004C8D0F /* ContentView.swift */; };
+		84B099C02FE2D73E004C8D0F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B099BF2FE2D73E004C8D0F /* Assets.xcassets */; };
+		84B099C32FE2D73E004C8D0F /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84B099C22FE2D73E004C8D0F /* Preview Assets.xcassets */; };
+		84B099CA2FE2DA44004C8D0F /* TelaDoPersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099C92FE2DA44004C8D0F /* TelaDoPersonagem.swift */; };
+		84B099CC2FE2DBEB004C8D0F /* Personagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099CB2FE2DBEB004C8D0F /* Personagem.swift */; };
+		84B099CE2FE2E7E2004C8D0F /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099CD2FE2E7E2004C8D0F /* Item.swift */; };
+		4FA7D6D4D30BAA0347C57AA9 /* ClasseDePersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */; };
+		A630E86271B2E4E2DF19DB3B /* Inimigo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */; };
+		D838EFF7FEAC659311698F95 /* Zona.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0229277D8230F3680457513A /* Zona.swift */; };
+		FEFF1FAE6F897E7969A3C3B0 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C81688D515EA4734D89F42D2 /* GameViewModel.swift */; };
+		3EED14687371310AC04EDFCF /* TelaCriacaoDePersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */; };
+		417DDDAA97747AAC12069029 /* TelaDeMasmorras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */; };
+		039F49BE9D2FAD85616005A5 /* TelaDeCombate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8509E1EC7F1FA7723D007B6 /* TelaDeCombate.swift */; };
+		E0E9C33912A89F2DB8288269 /* Magia.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2465FE8ABC138FB09C67610 /* Magia.swift */; };
+		0D860A9C6CE7208FD86E6E07 /* PerfilDoJogador.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92FEF1AAB079CFE1DBB87C5 /* PerfilDoJogador.swift */; };
+		97323D417D900C0DF3F81924 /* TelaDeCadastro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC21B67E2A1FBF146074E96 /* TelaDeCadastro.swift */; };
+		C63289B7E82FDA18FFBAE902 /* TelaDeHerois.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E768C29500719A658592296 /* TelaDeHerois.swift */; };
+		04C0DDB368C9B428FD00DD77 /* TelaDeEquipamento.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		844C15E32FE38FF500A2E5D6 /* TelaDoMercado.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDoMercado.swift; sourceTree = "<group>"; };
+		84B099B82FE2D73C004C8D0F /* SoulGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoulGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		84B099BB2FE2D73C004C8D0F /* SoulGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulGridApp.swift; sourceTree = "<group>"; };
+		84B099BD2FE2D73C004C8D0F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		84B099BF2FE2D73E004C8D0F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		84B099C22FE2D73E004C8D0F /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		84B099C92FE2DA44004C8D0F /* TelaDoPersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDoPersonagem.swift; sourceTree = "<group>"; };
+		84B099CB2FE2DBEB004C8D0F /* Personagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Personagem.swift; sourceTree = "<group>"; };
+		84B099CD2FE2E7E2004C8D0F /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
+		12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClasseDePersonagem.swift; sourceTree = "<group>"; };
+		CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inimigo.swift; sourceTree = "<group>"; };
+		0229277D8230F3680457513A /* Zona.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Zona.swift; sourceTree = "<group>"; };
+		C81688D515EA4734D89F42D2 /* GameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
+		4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaCriacaoDePersonagem.swift; sourceTree = "<group>"; };
+		4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeMasmorras.swift; sourceTree = "<group>"; };
+		E8509E1EC7F1FA7723D007B6 /* TelaDeCombate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeCombate.swift; sourceTree = "<group>"; };
+		F2465FE8ABC138FB09C67610 /* Magia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Magia.swift; sourceTree = "<group>"; };
+		F92FEF1AAB079CFE1DBB87C5 /* PerfilDoJogador.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfilDoJogador.swift; sourceTree = "<group>"; };
+		3EC21B67E2A1FBF146074E96 /* TelaDeCadastro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeCadastro.swift; sourceTree = "<group>"; };
+		1E768C29500719A658592296 /* TelaDeHerois.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeHerois.swift; sourceTree = "<group>"; };
+		73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeEquipamento.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		84B099B52FE2D73C004C8D0F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		84B099AF2FE2D73C004C8D0F = {
+			isa = PBXGroup;
+			children = (
+				84B099BA2FE2D73C004C8D0F /* SoulGrid */,
+				84B099B92FE2D73C004C8D0F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		84B099B92FE2D73C004C8D0F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				84B099B82FE2D73C004C8D0F /* SoulGrid.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		84B099BA2FE2D73C004C8D0F /* SoulGrid */ = {
+			isa = PBXGroup;
+			children = (
+				84B099BB2FE2D73C004C8D0F /* SoulGridApp.swift */,
+				84B099BD2FE2D73C004C8D0F /* ContentView.swift */,
+				84B099BF2FE2D73E004C8D0F /* Assets.xcassets */,
+				84B099C12FE2D73E004C8D0F /* Preview Content */,
+				84B099C92FE2DA44004C8D0F /* TelaDoPersonagem.swift */,
+				84B099CB2FE2DBEB004C8D0F /* Personagem.swift */,
+				84B099CD2FE2E7E2004C8D0F /* Item.swift */,
+				844C15E32FE38FF500A2E5D6 /* TelaDoMercado.swift */,
+				12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */,
+				F2465FE8ABC138FB09C67610 /* Magia.swift */,
+				CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */,
+				0229277D8230F3680457513A /* Zona.swift */,
+				C81688D515EA4734D89F42D2 /* GameViewModel.swift */,
+				4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */,
+				4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */,
+				E8509E1EC7F1FA7723D007B6 /* TelaDeCombate.swift */,
+				F92FEF1AAB079CFE1DBB87C5 /* PerfilDoJogador.swift */,
+				3EC21B67E2A1FBF146074E96 /* TelaDeCadastro.swift */,
+				1E768C29500719A658592296 /* TelaDeHerois.swift */,
+				73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */,
+			);
+			path = SoulGrid;
+			sourceTree = "<group>";
+		};
+		84B099C12FE2D73E004C8D0F /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				84B099C22FE2D73E004C8D0F /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		84B099B72FE2D73C004C8D0F /* SoulGrid */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 84B099C62FE2D73E004C8D0F /* Build configuration list for PBXNativeTarget "SoulGrid" */;
+			buildPhases = (
+				84B099B42FE2D73C004C8D0F /* Sources */,
+				84B099B52FE2D73C004C8D0F /* Frameworks */,
+				84B099B62FE2D73C004C8D0F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SoulGrid;
+			productName = SoulGrid;
+			productReference = 84B099B82FE2D73C004C8D0F /* SoulGrid.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		84B099B02FE2D73C004C8D0F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1420;
+				LastUpgradeCheck = 1420;
+				TargetAttributes = {
+					84B099B72FE2D73C004C8D0F = {
+						CreatedOnToolsVersion = 14.2;
+					};
+				};
+			};
+			buildConfigurationList = 84B099B32FE2D73C004C8D0F /* Build configuration list for PBXProject "SoulGrid" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 84B099AF2FE2D73C004C8D0F;
+			productRefGroup = 84B099B92FE2D73C004C8D0F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				84B099B72FE2D73C004C8D0F /* SoulGrid */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		84B099B62FE2D73C004C8D0F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				84B099C32FE2D73E004C8D0F /* Preview Assets.xcassets in Resources */,
+				84B099C02FE2D73E004C8D0F /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		84B099B42FE2D73C004C8D0F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				84B099CE2FE2E7E2004C8D0F /* Item.swift in Sources */,
+				84B099CC2FE2DBEB004C8D0F /* Personagem.swift in Sources */,
+				84B099BE2FE2D73C004C8D0F /* ContentView.swift in Sources */,
+				84B099BC2FE2D73C004C8D0F /* SoulGridApp.swift in Sources */,
+				844C15E42FE38FF500A2E5D6 /* TelaDoMercado.swift in Sources */,
+				84B099CA2FE2DA44004C8D0F /* TelaDoPersonagem.swift in Sources */,
+				4FA7D6D4D30BAA0347C57AA9 /* ClasseDePersonagem.swift in Sources */,
+				E0E9C33912A89F2DB8288269 /* Magia.swift in Sources */,
+				A630E86271B2E4E2DF19DB3B /* Inimigo.swift in Sources */,
+				D838EFF7FEAC659311698F95 /* Zona.swift in Sources */,
+				FEFF1FAE6F897E7969A3C3B0 /* GameViewModel.swift in Sources */,
+				3EED14687371310AC04EDFCF /* TelaCriacaoDePersonagem.swift in Sources */,
+				417DDDAA97747AAC12069029 /* TelaDeMasmorras.swift in Sources */,
+				039F49BE9D2FAD85616005A5 /* TelaDeCombate.swift in Sources */,
+				0D860A9C6CE7208FD86E6E07 /* PerfilDoJogador.swift in Sources */,
+				97323D417D900C0DF3F81924 /* TelaDeCadastro.swift in Sources */,
+				C63289B7E82FDA18FFBAE902 /* TelaDeHerois.swift in Sources */,
+				04C0DDB368C9B428FD00DD77 /* TelaDeEquipamento.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		84B099C42FE2D73E004C8D0F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		84B099C52FE2D73E004C8D0F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		84B099C72FE2D73E004C8D0F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"SoulGrid/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jr.SoulGrid;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		84B099C82FE2D73E004C8D0F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"SoulGrid/Preview Content\"";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jr.SoulGrid;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		84B099B32FE2D73C004C8D0F /* Build configuration list for PBXProject "SoulGrid" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84B099C42FE2D73E004C8D0F /* Debug */,
+				84B099C52FE2D73E004C8D0F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		84B099C62FE2D73E004C8D0F /* Build configuration list for PBXNativeTarget "SoulGrid" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				84B099C72FE2D73E004C8D0F /* Debug */,
+				84B099C82FE2D73E004C8D0F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 84B099B02FE2D73C004C8D0F /* Project object */;
+}

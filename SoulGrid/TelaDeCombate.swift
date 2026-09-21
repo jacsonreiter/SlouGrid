@@ -1,0 +1,650 @@
+import SwiftUI
+import UIKit
+
+struct TelaDeCombate: View {
+    @EnvironmentObject var vm: GameViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    let zona: Zona
+    let contraChefe: Bool
+
+    @State private var inimigo: Inimigo
+    @State private var log: [String] = []
+    @State private var combateEncerrado = false
+    @State private var vitoria = false
+    @State private var mostrandoItens = false
+    @State private var mostrandoMagias = false
+
+    // Efeitos ativos no inimigo (só duram durante este combate).
+    @State private var veneno: (dano: Int, turnos: Int)? = nil
+    @State private var inimigoAtordoado = false
+
+    // Fortalecimentos ativos no herói (só duram durante este combate,
+    // nunca alteram os atributos salvos do personagem).
+    @State private var bonusForcaTemporario = 0
+    @State private var turnosDeBonusForca = 0
+    @State private var bonusDefesaTemporaria = 0
+    @State private var turnosDeBonusDefesa = 0
+    @State private var bonusInteligenciaTemporaria = 0
+    @State private var turnosDeBonusInteligencia = 0
+    @State private var bonusAgilidadeTemporaria = 0
+    @State private var turnosDeBonusAgilidade = 0
+
+    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int) {
+        self.zona = zona
+        self.contraChefe = contraChefe
+        _inimigo = State(initialValue: contraChefe
+            ? zona.gerarChefe(nivelHeroi: nivelHeroi)
+            : zona.gerarInimigoComum(nivelHeroi: nivelHeroi))
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                inimigoCard
+                heroiCard
+                logDeCombate
+
+                if combateEncerrado {
+                    resultadoBox
+                } else {
+                    acoesDeCombate
+                }
+            }
+            .padding()
+        }
+        .navigationTitle(zona.nome)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: iniciarSeNecessario)
+        .sheet(isPresented: $mostrandoItens) {
+            listaDeItens
+        }
+        .sheet(isPresented: $mostrandoMagias) {
+            listaDeMagias
+        }
+    }
+
+    // MARK: - Cartões de status
+
+    var inimigoCard: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: inimigo.icone)
+                    .font(.system(size: 40))
+                    .foregroundColor(inimigo.chefe ? .red : .primary)
+                VStack(alignment: .leading) {
+                    Text(inimigo.nome).font(.title3).fontWeight(.bold)
+                    Text("Nível \(inimigo.nivel)\(inimigo.chefe ? " · Chefe" : "")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    if veneno != nil {
+                        Label("Envenenado", systemImage: "drop.fill")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                    if inimigoAtordoado {
+                        Label("Atordoado", systemImage: "zzz")
+                            .font(.caption2)
+                            .foregroundColor(.yellow)
+                    }
+                }
+            }
+            ProgressView(value: Double(inimigo.vidaAtual), total: Double(inimigo.vidaMaxima))
+                .tint(.red)
+            Text("\(inimigo.vidaAtual) / \(inimigo.vidaMaxima) vida")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(inimigo.chefe ? Color.red.opacity(0.1) : Color.gray.opacity(0.1))
+        .cornerRadius(12)
+    }
+
+    var heroiCard: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Image(systemName: vm.heroi.classe.icone)
+                    .font(.system(size: 32))
+                    .foregroundColor(.blue)
+                VStack(alignment: .leading) {
+                    Text(vm.heroi.nome).font(.headline)
+                    Text("Nível \(vm.heroi.nivel)").font(.caption).foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            ProgressView(value: Double(vm.heroi.vidaAtual), total: Double(vm.heroi.vidaMaxima))
+                .tint(.green)
+            Text("\(vm.heroi.vidaAtual) / \(vm.heroi.vidaMaxima) vida")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            ProgressView(value: Double(vm.heroi.energiaAtual), total: Double(vm.heroi.energiaMaximaTotal))
+                .tint(.blue)
+            Text("\(vm.heroi.energiaAtual) / \(vm.heroi.energiaMaximaTotal) \(vm.heroi.classe.nomeDoRecurso.lowercased())")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+
+            if bonusForcaTemporario > 0 || bonusDefesaTemporaria > 0 || bonusInteligenciaTemporaria > 0 || bonusAgilidadeTemporaria > 0 {
+                VStack(spacing: 4) {
+                    HStack(spacing: 12) {
+                        if bonusForcaTemporario > 0 {
+                            Label("+\(bonusForcaTemporario) Força (\(turnosDeBonusForca)t)", systemImage: "arrow.up.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                        if bonusDefesaTemporaria > 0 {
+                            Label("+\(bonusDefesaTemporaria) Defesa (\(turnosDeBonusDefesa)t)", systemImage: "shield.fill")
+                                .font(.caption2)
+                                .foregroundColor(.cyan)
+                        }
+                    }
+                    HStack(spacing: 12) {
+                        if bonusInteligenciaTemporaria > 0 {
+                            Label("+\(bonusInteligenciaTemporaria) Intel. (\(turnosDeBonusInteligencia)t)", systemImage: "brain.head.profile")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                        }
+                        if bonusAgilidadeTemporaria > 0 {
+                            Label("+\(bonusAgilidadeTemporaria) Agilidade (\(turnosDeBonusAgilidade)t)", systemImage: "hare.fill")
+                                .font(.caption2)
+                                .foregroundColor(.mint)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.blue.opacity(0.08))
+        .cornerRadius(12)
+    }
+
+    var logDeCombate: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(log.enumerated().reversed()), id: \.offset) { _, linha in
+                Text(linha).font(.caption)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.gray.opacity(0.06))
+        .cornerRadius(10)
+        .frame(minHeight: 80)
+    }
+
+    // MARK: - Ações
+
+    var acoesDeCombate: some View {
+        VStack(spacing: 10) {
+            Button { atacar() } label: {
+                Label("Atacar", systemImage: "bolt.fill")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.red)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+            }
+
+            if let habilidade = vm.heroi.armaEquipada?.habilidadeDeArma {
+                botaoDeGolpeDeArma(habilidade)
+            }
+
+            HStack(spacing: 8) {
+                ForEach(0..<Personagem.numeroDeSlotsDeMagia, id: \.self) { indice in
+                    botaoDeSlotDeMagia(indice)
+                }
+            }
+
+            if vm.heroi.cargasDeFrascoTotal > 0 {
+                HStack(spacing: 8) {
+                    botaoDeFrasco(titulo: "Frasco de Vida", icone: "drop.fill", cor: .pink,
+                                  atuais: vm.heroi.frascosDeVidaAtuais, alocados: vm.heroi.frascosDeVidaAlocados,
+                                  acao: usarFrascoDeVida)
+                    botaoDeFrasco(titulo: "Frasco de \(vm.heroi.classe.nomeDoRecurso)", icone: "flask.fill", cor: .teal,
+                                  atuais: vm.heroi.frascosDeEnergiaAtuais, alocados: vm.heroi.frascosDeEnergiaAlocados,
+                                  acao: usarFrascoDeEnergia)
+                }
+            }
+
+            HStack {
+                Button { mostrandoItens = true } label: {
+                    Label("Itens", systemImage: "bag.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                Button { mostrandoMagias = true } label: {
+                    Label("Grimório", systemImage: "sparkles")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.purple)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                Button { fugir() } label: {
+                    Label("Fugir", systemImage: "figure.run")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+            }
+        }
+    }
+
+    // Slot de ataque rápido: um toque só, sem precisar abrir o grimório.
+    func botaoDeSlotDeMagia(_ indice: Int) -> some View {
+        let magia = vm.heroi.magiaNoSlot(indice)
+        let energiaSuficiente = magia != nil && vm.heroi.energiaAtual >= magia!.custoEnergia
+
+        return Button {
+            if let magia = magia {
+                lancarMagia(magia)
+            }
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: magia?.icone ?? "minus.circle")
+                    .font(.title3)
+                Text(magia?.nome ?? "Vazio")
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                if let magia = magia {
+                    Text("\(magia.custoEnergia) EN")
+                        .font(.system(size: 9))
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .padding(.vertical, 6)
+            .background(magia == nil ? Color.gray.opacity(0.35) : (energiaSuficiente ? Color.purple : Color.gray))
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+        .disabled(magia == nil || !energiaSuficiente)
+    }
+
+    // "Golpe de Arma" (estilo Ash of War): a habilidade especial da arma
+    // equipada. Reaproveita `lancarMagia` — mesmo motor de dano/efeito do
+    // grimório — já que a habilidade nada mais é que uma `Magia` carregada
+    // pelo item em vez de escolhida pelo jogador em um slot.
+    func botaoDeGolpeDeArma(_ habilidade: Magia) -> some View {
+        let energiaSuficiente = vm.heroi.energiaAtual >= habilidade.custoEnergia
+        return Button { lancarMagia(habilidade) } label: {
+            Label("\(habilidade.nome) (\(habilidade.custoEnergia) EN)", systemImage: habilidade.icone)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(energiaSuficiente ? Color.indigo : Color.gray)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+        }
+        .disabled(!energiaSuficiente || combateEncerrado)
+    }
+
+    // Frasco Sagrado: cura/energia gratuita com cargas limitadas, recarrega
+    // só ao descansar (ver `Personagem.descansar`).
+    func botaoDeFrasco(titulo: String, icone: String, cor: Color, atuais: Int, alocados: Int, acao: @escaping () -> Void) -> some View {
+        Button(action: acao) {
+            VStack(spacing: 2) {
+                Image(systemName: icone).font(.title3)
+                Text(titulo).font(.caption2).lineLimit(1).minimumScaleFactor(0.7)
+                Text("\(atuais)/\(alocados)").font(.system(size: 9))
+            }
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .padding(.vertical, 6)
+            .background(atuais > 0 ? cor : Color.gray.opacity(0.5))
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+        .disabled(atuais <= 0 || combateEncerrado)
+    }
+
+    var resultadoBox: some View {
+        VStack(spacing: 12) {
+            Image(systemName: vitoria ? "checkmark.seal.fill" : "xmark.seal.fill")
+                .font(.system(size: 50))
+                .foregroundColor(vitoria ? .green : .red)
+            Text(vitoria ? "Vitória!" : "Derrota")
+                .font(.title)
+                .fontWeight(.bold)
+            Button("Continuar") { dismiss() }
+                .font(.title3)
+                .padding(.horizontal, 30)
+                .padding(.vertical, 10)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+        }
+        .padding()
+    }
+
+    var listaDeItens: some View {
+        NavigationStack {
+            List {
+                let pocoes = vm.heroi.inventario.filter { $0.item.tipo == .pocao }
+                if pocoes.isEmpty {
+                    Text("Você não tem poções.").foregroundColor(.secondary)
+                } else {
+                    ForEach(pocoes) { pilha in
+                        Button {
+                            usarItem(pilha)
+                        } label: {
+                            HStack {
+                                Text("\(pilha.item.nome) x\(pilha.quantidade)")
+                                Spacer()
+                                Text(pilha.item.descricao).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Usar Item")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Fechar") { mostrandoItens = false }
+                }
+            }
+        }
+    }
+
+    var listaDeMagias: some View {
+        NavigationStack {
+            List {
+                let magias = vm.heroi.classe.grimorio
+                    .filter { $0.nivelNecessario <= vm.heroi.nivel }
+                    .sorted { $0.nivelNecessario < $1.nivelNecessario }
+                ForEach(magias) { magia in
+                    Button {
+                        lancarMagia(magia)
+                    } label: {
+                        HStack {
+                            Image(systemName: magia.icone)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(magia.nome).font(.headline)
+                                Text(magia.descricao)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Text("\(magia.custoEnergia) EN")
+                                .font(.caption)
+                                .foregroundColor(vm.heroi.energiaAtual >= magia.custoEnergia ? .blue : .red)
+                        }
+                    }
+                    .disabled(vm.heroi.energiaAtual < magia.custoEnergia)
+                }
+            }
+            .navigationTitle("Magias")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Fechar") { mostrandoMagias = false }
+                }
+            }
+        }
+    }
+
+    // MARK: - Lógica de combate
+
+    private func iniciarSeNecessario() {
+        if log.isEmpty {
+            log.append(inimigo.chefe ? "O chefe \(inimigo.nome) apareceu!" : "\(inimigo.nome) apareceu!")
+        }
+    }
+
+    // Destreza rege a chance de acerto — usada tanto pelo ataque básico
+    // quanto pelas magias ofensivas (ver `lancarMagia`).
+    private func rolarAcerto() -> Bool {
+        Int.random(in: 1...100) <= vm.heroi.chanceDeAcerto
+    }
+
+    private func atacar() {
+        guard !combateEncerrado else { return }
+        guard rolarAcerto() else {
+            log.append("Você errou o ataque!")
+            turnoDoInimigo()
+            return
+        }
+        let resultado = vm.heroi.calcularDanoBasico(bonusForca: bonusForcaTemporario)
+        inimigo.vidaAtual = max(0, inimigo.vidaAtual - resultado.dano)
+        log.append(resultado.critico
+            ? "Você acertou um golpe crítico! -\(resultado.dano) de vida no \(inimigo.nome)."
+            : "Você atacou o \(inimigo.nome) causando \(resultado.dano) de dano.")
+        UIImpactFeedbackGenerator(style: resultado.critico ? .heavy : .medium).impactOccurred()
+
+        if !inimigo.estaVivo {
+            finalizarCombate(vitoria: true)
+        } else {
+            turnoDoInimigo()
+        }
+    }
+
+    private func lancarMagia(_ magia: Magia) {
+        guard !combateEncerrado else { return }
+        guard vm.heroi.energiaAtual >= magia.custoEnergia else {
+            log.append("Energia insuficiente para \(magia.nome)!")
+            return
+        }
+        vm.heroi.energiaAtual -= magia.custoEnergia
+        mostrandoMagias = false
+
+        if magia.tipo == .cura {
+            vm.heroi.vidaAtual = min(vm.heroi.vidaMaxima, vm.heroi.vidaAtual + magia.valorCura)
+            log.append("Você usou \(magia.nome) e recuperou \(magia.valorCura) de vida!")
+            turnoDoInimigo()
+            return
+        }
+
+        if magia.tipo == .fortalecimento {
+            var partes: [String] = []
+            if magia.bonusForca > 0 {
+                bonusForcaTemporario = magia.bonusForca
+                turnosDeBonusForca = magia.duracaoEmTurnos
+                partes.append("+\(magia.bonusForca) força")
+            }
+            if magia.bonusDefesa > 0 {
+                bonusDefesaTemporaria = magia.bonusDefesa
+                turnosDeBonusDefesa = magia.duracaoEmTurnos
+                partes.append("+\(magia.bonusDefesa) defesa")
+            }
+            if magia.bonusInteligencia > 0 {
+                bonusInteligenciaTemporaria = magia.bonusInteligencia
+                turnosDeBonusInteligencia = magia.duracaoEmTurnos
+                partes.append("+\(magia.bonusInteligencia) inteligência")
+            }
+            if magia.bonusAgilidade > 0 {
+                bonusAgilidadeTemporaria = magia.bonusAgilidade
+                turnosDeBonusAgilidade = magia.duracaoEmTurnos
+                partes.append("+\(magia.bonusAgilidade) agilidade")
+            }
+            log.append("Você usou \(magia.nome)! \(partes.joined(separator: " e ")) por \(magia.duracaoEmTurnos) turnos.")
+            turnoDoInimigo()
+            return
+        }
+
+        // Magias ofensivas (dano, veneno, atordoante) também dependem de
+        // Destreza para acertar — exceto as marcadas como certeiras.
+        if !magia.sempreAcerta && !rolarAcerto() {
+            log.append("Sua magia \(magia.nome) falhou!")
+            turnoDoInimigo()
+            return
+        }
+
+        // O atributo que escala a magia depende da classe/magia (Força,
+        // Inteligência ou Agilidade), incluindo fortalecimentos ativos.
+        let atributoBase: Int
+        switch magia.atributoDeEscala {
+        case .forca: atributoBase = vm.heroi.forcaTotal + bonusForcaTemporario
+        case .inteligencia: atributoBase = vm.heroi.inteligenciaTotal + bonusInteligenciaTemporaria
+        case .agilidade: atributoBase = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
+        }
+
+        let dano = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
+        inimigo.vidaAtual = max(0, inimigo.vidaAtual - dano)
+        var texto = "Você usou \(magia.nome) e causou \(dano) de dano!"
+
+        if magia.tipo == .danoComEfeito {
+            let danoPorTurno = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            veneno = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos)
+            texto += " O inimigo está envenenado."
+        } else if magia.tipo == .atordoante {
+            inimigoAtordoado = true
+            texto += " O inimigo ficou atordoado!"
+        }
+
+        if magia.valorCura > 0 {
+            vm.heroi.vidaAtual = min(vm.heroi.vidaMaxima, vm.heroi.vidaAtual + magia.valorCura)
+            texto += " Você recuperou \(magia.valorCura) de vida."
+        }
+
+        log.append(texto)
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+
+        if !inimigo.estaVivo {
+            finalizarCombate(vitoria: true)
+        } else {
+            turnoDoInimigo()
+        }
+    }
+
+    private func usarFrascoDeVida() {
+        guard !combateEncerrado else { return }
+        log.append(vm.heroi.usarFrascoDeVida())
+        turnoDoInimigo()
+    }
+
+    private func usarFrascoDeEnergia() {
+        guard !combateEncerrado else { return }
+        log.append(vm.heroi.usarFrascoDeEnergia())
+        turnoDoInimigo()
+    }
+
+    private func usarItem(_ pilha: PilhaDeItens) {
+        guard !combateEncerrado else { return }
+        let efeito = pilha.item.efeitoDePocao
+        log.append(vm.heroi.usarItem(pilha))
+        if efeito == .antidoto { veneno = nil }
+        mostrandoItens = false
+        turnoDoInimigo()
+    }
+
+    private func fugir() {
+        guard !combateEncerrado else { return }
+        if Int.random(in: 1...100) <= 50 {
+            log.append("Você fugiu do combate!")
+            combateEncerrado = true
+            vitoria = false
+        } else {
+            log.append("Você tentou fugir, mas não conseguiu!")
+            turnoDoInimigo()
+        }
+    }
+
+    private func turnoDoInimigo() {
+        guard inimigo.estaVivo else { return }
+
+        aplicarRegenPassivaDeTalisma()
+
+        if turnosDeBonusForca > 0 {
+            turnosDeBonusForca -= 1
+            if turnosDeBonusForca == 0 {
+                bonusForcaTemporario = 0
+                log.append("O efeito de força aumentada acabou.")
+            }
+        }
+        if turnosDeBonusDefesa > 0 {
+            turnosDeBonusDefesa -= 1
+            if turnosDeBonusDefesa == 0 {
+                bonusDefesaTemporaria = 0
+                log.append("O efeito de defesa aumentada acabou.")
+            }
+        }
+        if turnosDeBonusInteligencia > 0 {
+            turnosDeBonusInteligencia -= 1
+            if turnosDeBonusInteligencia == 0 {
+                bonusInteligenciaTemporaria = 0
+                log.append("O efeito de inteligência aumentada acabou.")
+            }
+        }
+        if turnosDeBonusAgilidade > 0 {
+            turnosDeBonusAgilidade -= 1
+            if turnosDeBonusAgilidade == 0 {
+                bonusAgilidadeTemporaria = 0
+                log.append("O efeito de agilidade aumentada acabou.")
+            }
+        }
+
+        if let venenoAtivo = veneno {
+            inimigo.vidaAtual = max(0, inimigo.vidaAtual - venenoAtivo.dano)
+            log.append("O veneno causa \(venenoAtivo.dano) de dano em \(inimigo.nome).")
+            veneno = venenoAtivo.turnos <= 1 ? nil : (dano: venenoAtivo.dano, turnos: venenoAtivo.turnos - 1)
+
+            if !inimigo.estaVivo {
+                finalizarCombate(vitoria: true)
+                return
+            }
+        }
+
+        if inimigoAtordoado {
+            log.append("\(inimigo.nome) está atordoado e perde o turno!")
+            inimigoAtordoado = false
+            vm.heroi.regenerarEnergia(5 + vm.heroi.regenEnergiaPorTurno)
+            return
+        }
+
+        let resultado = vm.heroi.sofrerDano(deInimigo: inimigo.forca, bonusDefesa: bonusDefesaTemporaria)
+        if resultado.esquivou {
+            log.append("Você esquivou do ataque de \(inimigo.nome)!")
+        } else {
+            log.append("\(inimigo.nome) atacou você causando \(resultado.dano) de dano.")
+        }
+        vm.heroi.regenerarEnergia(5 + vm.heroi.regenEnergiaPorTurno)
+
+        if !vm.heroi.estaVivo {
+            finalizarCombate(vitoria: false)
+        }
+    }
+
+    // Talismãs de regen (Amuleto da Regeneração, Coração da Fênix, etc.)
+    // curam uma quantidade fixa por turno, além da recuperação normal de
+    // energia — passivo, então roda todo turno, atordoado ou não.
+    private func aplicarRegenPassivaDeTalisma() {
+        let regenVida = vm.heroi.regenVidaPorTurno
+        guard regenVida > 0, vm.heroi.vidaAtual < vm.heroi.vidaMaxima else { return }
+        vm.heroi.regenerarVida(regenVida)
+        log.append("Seu talismã restaura \(regenVida) de vida.")
+    }
+
+    private func finalizarCombate(vitoria: Bool) {
+        combateEncerrado = true
+        self.vitoria = vitoria
+
+        if vitoria {
+            let recompensa = vm.heroi.receberRecompensa(deInimigo: inimigo)
+            var texto = "Vitória! +\(recompensa.runas) Runas."
+            if let item = recompensa.item {
+                texto += " Encontrou: \(item.nome)!"
+            }
+            log.append(texto)
+            if let zonaDaRunica = recompensa.novaRunica {
+                log.append("Você conquistou a Grande Rúnica de \(zonaDaRunica)! Selecione-a na tela de Equipamento e descanse para ativá-la.")
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } else {
+            log.append("Você foi derrotado! Volte para descansar.")
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+    }
+}
+
+struct TelaDeCombate_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            TelaDeCombate(zona: zonasDoJogo[0], contraChefe: false, nivelHeroi: 1)
+                .environmentObject(GameViewModel())
+        }
+    }
+}
