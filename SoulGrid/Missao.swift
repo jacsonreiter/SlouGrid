@@ -217,7 +217,7 @@ extension Missao {
                recompensaRunas: 700,
                recompensaItem: Item(nome: "Olho da Videncia", tipo: .acessorio, valor: 0, preco: 0,
                                      raridade: .epico, nivelMinimo: 30,
-                                     bonus: BonusDeAtributos(sorte: 12, destreza: 8, bonusRaridadeDeItem: 1)),
+                                     bonus: BonusDeAtributos(destreza: 8, sorte: 12, bonusRaridadeDeItem: 1)),
                pnjID: "ithra",
                loreAoEntregar: "Os olhos de Ithra ficam brancos por um instante. \"Eu vi... um Devorador, adormecido sob estrelas erradas, prestes a acordar. O selo que o prende está quase rompido. Você é a última esperança que enxerguei nessa visão.\""),
         Missao(id: "ithra_dominio", titulo: "Domínio sobre o Abismo",
