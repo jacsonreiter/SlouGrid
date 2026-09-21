@@ -23,6 +23,13 @@ struct Zona: Identifiable {
     // ali.
     private static let alcanceDeEscalaAcimaDaZona = 6
 
+    // Defesa cresce mais rápido que antes (2×nível em vez de 1×) — o motivo
+    // é puramente contra o burst de magia de alto Inteligência: antes um
+    // nuke de mago no fim de jogo simplesmente ignorava a defesa e matava
+    // em 1-2 golpes qualquer coisa, trivializando masmorras avançadas. Vida
+    // e Força ficam como estavam: o principal reforço de perigo agora vem
+    // da quantidade de inimigos por encontro (`gerarGrupoComum`), não de
+    // cada um ficar individualmente mais tanque.
     func gerarInimigoComum(nivelHeroi: Int) -> Inimigo {
         let nivel = min(nivelBaseInimigos + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos, nivelHeroi))
         let vida = 24 + nivel * 11
@@ -33,7 +40,7 @@ struct Zona: Identifiable {
             vidaMaxima: vida,
             vidaAtual: vida,
             forca: 5 + nivel * 3,
-            defesa: 1 + nivel,
+            defesa: 2 + nivel * 2,
             xpRecompensa: 14 + nivel * 7,
             ouroRecompensa: (6 + nivel * 3)...(12 + nivel * 5),
             chefe: false,
@@ -51,12 +58,45 @@ struct Zona: Identifiable {
             vidaMaxima: vida,
             vidaAtual: vida,
             forca: 10 + nivel * 4,
-            defesa: 4 + nivel * 2,
+            defesa: 6 + nivel * 3,
             xpRecompensa: 120 + nivel * 14,
             ouroRecompensa: (60 + nivel * 8)...(110 + nivel * 12),
             chefe: true,
             zonaOrigem: nome
         )
+    }
+
+    // Grupo de inimigos comuns pra um único encontro — estilo os "camps" de
+    // Elden Ring, onde áreas mais avançadas colocam vários inimigos juntos
+    // em vez de só um mais forte. Quanto mais tardia a faixa da zona, maior
+    // a chance de enfrentar 2 ou até 3 de uma vez: o perigo real de um
+    // grupo não é a vida/força de cada um (que não mudou), é ter que
+    // dividir atenção enquanto todos os que ainda estão de pé atacam a
+    // cada turno.
+    func gerarGrupoComum(nivelHeroi: Int) -> [Inimigo] {
+        (0..<Zona.tamanhoDoGrupo(nivelBaseInimigos: nivelBaseInimigos)).map { _ in
+            gerarInimigoComum(nivelHeroi: nivelHeroi)
+        }
+    }
+
+    private static func tamanhoDoGrupo(nivelBaseInimigos: Int) -> Int {
+        let rolagem = Int.random(in: 1...100)
+        switch nivelBaseInimigos {
+        case ..<4: // Faixa 1
+            return rolagem <= 75 ? 1 : 2
+        case 4..<8: // Faixa 2
+            if rolagem <= 55 { return 1 }
+            if rolagem <= 95 { return 2 }
+            return 3
+        case 8..<13: // Faixa 3
+            if rolagem <= 40 { return 1 }
+            if rolagem <= 85 { return 2 }
+            return 3
+        default: // Faixa 4
+            if rolagem <= 25 { return 1 }
+            if rolagem <= 70 { return 2 }
+            return 3
+        }
     }
 
     // Um inimigo comum "inflado" para servir de field boss — mais vida,

@@ -720,3 +720,72 @@ aparecendo dentro do app também, nas telas principais.
   (irrelevante pra elas, já que quem trava é o `nivelMinimo` da própria
   arma) — se esse campo um dia passar a ser lido em outro contexto que não
   o grimório da classe, revisar.
+
+## Dificuldade: combate em grupo, defesa vs. magia, chefe com fúria (sessão seguinte)
+
+Feedback real de playtest do usuário: jogando de Mago, nível 16, a última
+masmorra do jogo (nível 13+) estava fácil demais — só os chefes ofereciam
+alguma resistência. Diagnóstico com os números na mão, não só sensação:
+
+- **A magia de maior dano do Mago (Meteoro, multiplicador 3.5x) com
+  Inteligência no teto praticamente ignorava a Defesa de um inimigo comum
+  de nível 16** (`defesa = 1 + nível` era só 17), matando em 1-2 golpes
+  qualquer coisa fora um chefe. `Personagem.valorEfetivoDeDano` (soft cap
+  de Inteligência) já existia, mas a Defesa do inimigo não escalava rápido
+  o bastante pra compensar o multiplicador alto das magias de fim de jogo.
+- **Bug real de balanceamento, não só "fácil": um chefe podia ser
+  atordoado (`Anel de Congelamento` etc.) em loop.** `inimigoAtordoado`
+  fazia o inimigo perder o turno inteiro; se o jogador conseguisse lançar
+  uma magia atordoante todo turno, o chefe nunca chegava a agir — o
+  "telegraph" do golpe carregado, pensado pra dar uma janela de reação,
+  virava trava permanente. Bosses de Elden Ring de verdade têm poise/
+  hyperarmor e não ficam perma-stunados por CC repetido; era esse o
+  princípio que faltava aqui.
+- **Todo combate era 1 herói vs. 1 inimigo**, sem exceção fora do chefe/
+  elite — sem "quantidade" nenhuma pra gerar pressão, diferente das áreas
+  mais avançadas de Elden Ring, que colocam vários inimigos juntos
+  (acampamentos, grupos de soldados/lobos) justamente pra isso.
+
+Mudanças (`Zona.swift`, `TelaDeCombate.swift`):
+
+- **Defesa dobrou de inclinação**: comum `1 + nível` → `2 + nível × 2`;
+  chefe `4 + nível × 2` → `6 + nível × 3`. Vida e Força de cada inimigo
+  ficaram como estavam — o objetivo era especificamente cortar o burst de
+  nuke mágico/físico de fim de jogo, não deixar cada inimigo individual
+  mais "esponja de dano" (isso combina mal com combate em grupo, ver
+  abaixo). Nível baixo quase não sente (defesa 2→4 no nível 1); nível alto
+  sente bastante (defesa 17→34 no nível 16).
+- **`Zona.gerarGrupoComum(nivelHeroi:)`**: encontros comuns agora podem
+  vir em grupo de 1-3 inimigos, com a chance subindo por faixa de zona —
+  faixa 1 quase sempre 1, faixa 4 (nível 13+) até 30% de chance de 3 de
+  uma vez. `TelaDeMasmorras` não precisou mudar nada: já delegava pro
+  init de `TelaDeCombate`, que agora chama `gerarGrupoComum` internamente
+  quando não é chefe nem elite.
+- **`TelaDeCombate` reescrita pra suportar `[Inimigo]` em vez de um só**
+  (chefe/elite continuam array de 1, mesmo caminho de código pros três
+  casos). Cartão de cada inimigo agora é tocável pra focar o alvo dos
+  ataques/magias (`indiceAlvo`); veneno e atordoamento passaram a ser
+  rastreados por índice (`venenoPorAlvo`/`atordoadoPorAlvo`), permitindo
+  vários inimigos envenenados ao mesmo tempo num grupo. **Todo inimigo
+  vivo age no turno dele** — é isso que torna o grupo perigoso de verdade:
+  ignorar 2 dos 3 pra focar fogo custa levar o ataque dos 2 ignorados
+  todo turno, uma tensão que 1v1 nunca tinha.
+- **Chefe ganhou fase de fúria (abaixo de 40% de vida)**: carrega o golpe
+  mais rápido (2 turnos em vez de 3) e bate mais forte (2.6x em vez de
+  2.2x) — o equivalente à fase 2 mais agressiva dos chefes de Elden Ring,
+  recalculado a cada turno a partir da vida atual (não é um estado fixo
+  que possa ser burlado).
+- **Corrigido o loop de atordoamento**: elite agora é sempre imune a
+  atordoante (grande/resistente demais); chefe pode ser atordoado, mas
+  fica 2 turnos imune depois de sofrer um — perde o turno uma vez, não
+  pode ser travado pra sempre. Inimigo comum continua livre pra ser
+  atordoado sem restrição (são só "mooks").
+- `finalizarCombate` agora soma a recompensa de todos os inimigos
+  derrotados no encontro (Runas + até um item por inimigo) — um grupo de
+  3 dá mais loot que um só, o risco extra tem retorno extra.
+
+Ainda não implementado (fora do escopo desta rodada, considerado e
+descartado por tamanho): elite com escolta de inimigos comuns junto
+(field boss guardado), pool de inimigos élite variado por zona. Validado
+só por leitura cuidadosa + balanceamento de parênteses/chaves via script —
+**sem playtest real de novo**, é a mesma ressalva já registrada acima.
