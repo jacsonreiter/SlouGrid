@@ -46,9 +46,21 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles
 
+          # Diagnóstico de tamanho/formato só (nunca imprime o profile em si)
+          # — um .mobileprovision típico tem alguns KB; se vier vazio/muito
+          # pequeno, o segredo BUILD_PROVISION_PROFILE_BASE64 está errado.
+          echo "Provisioning profile decodificado: $(wc -c < "$PP_PATH") bytes"
+
           # UUID do profile, pro Archive referenciar via PROVISIONING_PROFILE
-          # (assinatura manual, ver comentário no step Archive abaixo).
-          PROFILE_UUID=$(security cms -D -i "$PP_PATH" | /usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin)
+          # (assinatura manual, ver comentário no step Archive abaixo). Grava
+          # em arquivo em vez de pipe direto pro PlistBuddy, pra poder checar
+          # se o `security cms -D` (que decodifica o CMS/PKCS7 assinado pela
+          # Apple) realmente produziu algo antes de tentar ler o UUID dele.
+          PROFILE_PLIST="$RUNNER_TEMP/build_pp.plist"
+          security cms -D -i "$PP_PATH" -o "$PROFILE_PLIST"
+          echo "Profile plist decodificado: $(wc -c < "$PROFILE_PLIST") bytes"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
+          echo "Provisioning profile UUID: $PROFILE_UUID"
           echo "PROVISIONING_PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
 
       # A chave da App Store Connect API autentica o xcodebuild direto com a
