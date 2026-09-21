@@ -23,12 +23,15 @@ struct Zona: Identifiable {
     // ali.
     private static let alcanceDeEscalaAcimaDaZona = 6
 
-    // New Game+ (ver `Personagem.cicloNewGamePlus`): +25% de vida/força/
+    // New Game+ (ver `Personagem.cicloNewGamePlus`): +35% de vida/força/
     // defesa/recompensa por ciclo, linear (não composto) de propósito —
     // depois de vários ciclos o número continua alto mas nunca absurdo,
     // já que o jogador pode iniciar quantos ciclos quiser em sequência.
+    // (Subiu de +25% pra +35%: testes mostraram o primeiro ciclo caindo
+    // fácil demais mesmo pra quem só jogou casualmente — precisava doer
+    // mais pra valer a pena como progressão de verdade.)
     static func multiplicadorDeCiclo(_ ciclo: Int) -> Double {
-        1.0 + Double(ciclo) * 0.25
+        1.0 + Double(ciclo) * 0.35
     }
 
     // Defesa cresce mais rápido que antes (2×nível em vez de 1×) — o motivo
@@ -84,13 +87,17 @@ struct Zona: Identifiable {
     // dividir atenção enquanto todos os que ainda estão de pé atacam a
     // cada turno.
     func gerarGrupoComum(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> [Inimigo] {
-        (0..<Zona.tamanhoDoGrupo(nivelBaseInimigos: nivelBaseInimigos)).map { _ in
+        (0..<Zona.tamanhoDoGrupo(nivelBaseInimigos: nivelBaseInimigos, cicloNewGamePlus: cicloNewGamePlus)).map { _ in
             gerarInimigoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
         }
     }
 
-    private static func tamanhoDoGrupo(nivelBaseInimigos: Int) -> Int {
-        let rolagem = Int.random(in: 1...100)
+    private static func tamanhoDoGrupo(nivelBaseInimigos: Int, cicloNewGamePlus: Int = 0) -> Int {
+        // NG+ empurra a rolagem pra cima (sem nunca garantir o grupo
+        // máximo): cada ciclo é um mundo mais cheio de inimigos, não uma
+        // zona sempre lotada — mantém alguma variação mesmo em ciclos altos.
+        let viesDeNewGamePlus = min(30, cicloNewGamePlus * 8)
+        let rolagem = min(100, Int.random(in: 1...100) + viesDeNewGamePlus)
         switch nivelBaseInimigos {
         case ..<4: // Faixa 1
             return rolagem <= 75 ? 1 : 2

@@ -990,3 +990,142 @@ além de repetir masmorras mais difíceis); gate de "precisa derrotar o
 chefe final de novo" por ciclo, como o Elden Ring de verdade faz. Os
 dois dariam mais profundidade ao sistema se a base (o multiplicador em
 si) se provar divertida no playtest.
+
+## Sistema de status (Sangramento/Calafrio/Queimadura), Forja de equipamento e mais dificuldade (mesma sessão)
+
+Depois de testar o primeiro ciclo de New Game+, o usuário reportou já
+ter "zerado" ele só brincando — o jogo precisa de mais desafio/gameplay
+mais imersiva pra segurar o jogador ("um jogo mto fácil ninguém vai
+ficar"). No mesmo pedido, encomendou um "projeto de builds" pras 3
+classes (Guerreiro: tank/sangramento/lança; Mago: fogo/gelo além do
+arcano que já existia; Ladino: liberdade total) e, logo em seguida,
+pediu também um sistema de evolução de arma/armadura via um ferreiro
+(pedras de evolução dropando por tipo/masmorra) e um teto pro Frasco
+Sagrado (achou que Sementes/Lágrimas sem limite deixava o jogo
+"quebrado"). As duas frentes de dificuldade/build acabaram sendo a
+mesma solução: um sistema de status novo que também é a espinha dorsal
+mecânica das builds.
+
+### Teto do Frasco Sagrado
+
+`Personagem.cargasDeFrascoMaximo = 12` e `potenciaDoFrascoMaxima = 100`
+(dois `static let` novos). `usarItem` (efeitos `.aumentaFrascos` e
+`.aumentaPotenciaDoFrasco`) agora recusa consumir Semente/Lágrima além
+do teto — ou consome parcialmente, se sobrar espaço pra menos que o
+valor cheio do item — em vez de somar sem limite. Sementes e Lágrimas
+já dropavam em combate/exploração antes disso (fazem parte do
+`catalogoMercado`, de onde `lootAleatorio` sorteia), então "podem
+dropar sempre" já valia; só faltava o teto.
+
+### Forja: evolução de arma/armadura (Kael, o Ferreiro)
+
+- **`Item.nivelDeEvolucao: Int = 0`** (novo campo, 0 a
+  `Item.nivelMaximoDeEvolucao = 10`) — só relevante pra `.arma`/
+  `.armadura`. **`Item.bonusEvoluido`**: retorna o `bonus` escalado em
+  +8%/nível (até +80% no nível 10); todo item novo nasce em nível 0, ou
+  seja, com `bonusEvoluido == bonus` — nada muda pra equipamento
+  existente.
+- **`Item.pedrasDeForja`**: 4 pedras (uma por raridade, mesma escala de
+  `lootAleatorio`), drop-only — nunca entram no `catalogoMercado`.
+  `Personagem.receberRecompensa`/`receberDescoberta` ganharam uma
+  rolagem independente pra elas, igual ao material de zona.
+- **`Personagem.evoluirArmaEquipada()`/`evoluirArmaduraEquipada()`**:
+  consomem Pedras de Forja (tier da raridade da peça, quantidade =
+  nível atual + 1) e Runas (`80 + nível×60`), e só evoluem a peça
+  **equipada** — nunca uma cópia parada na mochila, pra não ambiguar
+  qual unidade duma pilha está sendo reforçada. Só a peça equipada
+  evolui é também a resposta direta ao pedido: "não sempre ter a arma e
+  armadura sempre no máximo quando já equipa ela" — agora equipar uma
+  arma nova é só o começo, o bônus real cresce aos poucos na Forja.
+- Bug evitado: `Personagem.adicionarItem` empilhava por nome só —
+  devolver uma arma evoluída pra mochila (trocar de equipamento)
+  misturaria ela numa pilha de cópias +0 já existentes, apagando o
+  reforço. Corrigido pra empilhar por nome **e** `nivelDeEvolucao`
+  juntos.
+- **UI**: a Forja mora dentro do card do Kael (`TelaDaVila`, PNJ que já
+  existia desde o milestone de nível 20 e já tinha a fala "Traga
+  material raro o bastante e eu forjo qualquer coisa" — só faltava a
+  mecânica). Mostra a peça equipada, nível atual, custo do próximo
+  reforço e um botão "Evoluir". `TelaDeEquipamento` e a descrição do
+  item (`Item.descricao`) também passaram a mostrar o bônus evoluído e
+  o "+N" quando aplicável.
+
+### Sangramento, Calafrio e Queimadura — sistema de status novo
+
+Três `TipoDeMagia` novos em `Magia.swift`, cada um com uma identidade
+mecânica própria (não é só "veneno com nome diferente"):
+
+- **Sangramento**: acúmulo por acerto (`acumuloDeStatus`); ao cruzar
+  100, explode em dano = 20% da vida MÁXIMA do alvo e zera o acúmulo —
+  ignora armadura, como o Bleed de Elden Ring. Base da build de
+  sangramento do Guerreiro/Ladino.
+- **Calafrio**: mesmo acúmulo até 100, mas ao explodir atordoa o alvo
+  (reaproveita a mesma imunidade de chefe/elite do atordoante comum) em
+  vez de causar dano. Base da build de gelo do Mago/Ladino.
+- **Queimadura**: dano por turno como o veneno, **mais** uma redução
+  percentual de Defesa (`reducaoDeDefesaPercentual`) enquanto ativa —
+  `TelaDeCombate.defesaEfetiva(doAlvo:)` centraliza esse cálculo, usado
+  tanto no ataque básico quanto nas magias. Base da build de fogo do
+  Mago.
+
+Os 2 campos novos de `Magia` (`acumuloDeStatus`, `reducaoDeDefesaPercentual`)
+são **`Optional`**, de propósito — `Magia` não tem `init(from:)` próprio
+(Codable sintetizado) e pode estar salva dentro do save de um jogador via
+`Item.habilidadeDeArma`; só um campo `Optional` ganha `decodeIfPresent`
+automático na síntese e cai em `nil` sem quebrar saves antigos.
+
+`TelaDeCombate` ganhou os dicionários `sangramentoPorAlvo`/
+`calafrioPorAlvo: [Int: Int]` (acúmulo) e `queimaduraPorAlvo: [Int:
+(dano:Int, turnos:Int, reducaoDefesa:Int)]`, resetados em
+`iniciarNovoEncontro()` e limpos na morte do alvo junto com veneno/
+atordoamento via um helper novo, `limparEfeitosDoAlvo(_:)` (evita
+"vazar" efeito de um índice do array pro próximo inimigo que ocupar a
+mesma posição). Bug pego e corrigido durante a implementação: a
+explosão do Sangramento pode matar o alvo DEPOIS do golpe inicial já
+ter sido considerado "ainda vivo" — `alvoAindaVivo` virou `var` e é
+reconferido depois da cadeia de efeitos, senão a mensagem de derrota e
+a limpeza de estado nunca aconteciam pra uma morte por explosão de
+sangramento.
+
+### 8 magias novas + 8 armas novas — o "projeto de builds"
+
+Grimório (`Magia.swift`): Guerreiro ganhou Corte Sangrento (sangramento,
+nível 6) e Investida da Lança (certeira, nível 11). Mago ganhou Chama
+Ardente/Explosão Flamejante (queimadura, níveis 7/13) e Lança de
+Gelo/Nova Glacial (calafrio, níveis 10/16). Ladino ganhou Corte
+Retalhante (sangramento, nível 6) e Lâmina Congelante (calafrio, nível
+11) — junto com o veneno que já existia, agora tem 3 identidades
+ofensivas.
+
+Armas (`Item.swift`, todas como "alternativa no mesmo patamar" de uma
+arma já existente, seguindo a convenção que o catálogo já usava):
+Guerreiro — Lâmina e Broquel (tank, dá Defesa em vez de só Força),
+Machado Serrilhado (sangramento), Lança Longa (certeira). Mago — Cajado
+das Chamas e Cetro do Inferno (queimadura), Cajado Glacial (calafrio).
+Ladino — Facas Serrilhadas (sangramento), Lâminas Congelantes
+(calafrio). Cada uma carrega o status correspondente como Golpe de
+Arma, então a build fica disponível mesmo antes do jogador chegar ao
+nível da magia equivalente no grimório.
+
+### Mais dificuldade/imersão
+
+- **`Zona.multiplicadorDeCiclo`**: `+25%` → `+35%` por ciclo de New
+  Game+ — resposta direta ao "já zerei o primeiro ciclo só em teste".
+- **`Zona.tamanhoDoGrupo`** ganhou um parâmetro `cicloNewGamePlus`: cada
+  ciclo empurra a rolagem de tamanho de grupo pra cima (até +30, nunca
+  garante o grupo máximo), então NG+ também fica mais cheio de
+  inimigos, não só mais tanque.
+- **Telegraph do chefe randomizado**: `turnosAteGolpeDoChefe` deixou de
+  ser fixo (3 turnos normal / 2 enfurecido) e virou uma faixa
+  (`2...4` normal, `1...2` enfurecido) sorteada a cada carga — o padrão
+  continua "aprendível" (o aviso de "carregando golpe!" sempre vem um
+  turno antes), mas o timing exato não dá mais pra decorar e piloto
+  automático.
+
+Validado só por leitura cuidadosa + balanceamento de parênteses/chaves/
+colchetes e auditoria de ordem de argumentos nomeados (script Python,
+mesma técnica de sempre) em todos os arquivos tocados — **sem playtest
+real**. Pontos de atenção pro próximo playtest: os limiares de 100 de
+acúmulo pra Sangramento/Calafrio (rápido demais? devagar demais?), e se
+o custo de Pedras de Forja (nível atual + 1, crescendo até 10 na peça
++10) soa justo dado o novo ritmo de drop.

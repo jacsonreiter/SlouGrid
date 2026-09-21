@@ -163,6 +163,12 @@ struct Item: Codable, Identifiable {
     // dropa (ver `Item.materialDaZona`). `nil` = material "genérico", sem
     // zona nenhuma — só serve pra vender (ver `Item.materiaisGenericos`).
     var zonaDeOrigem: String? = nil
+    // Só relevante para `tipo == .arma`/`.armadura`: quantas vezes essa
+    // peça já foi reforçada na Forja (ver `Personagem.evoluirArmaEquipada`/
+    // `evoluirArmaduraEquipada`), de 0 até `Item.nivelMaximoDeEvolucao`.
+    // Fica sempre 0 pra qualquer item recém-saído do catálogo/loot — só
+    // sobe consumindo Pedras de Forja, o que evita já nascer no teto.
+    var nivelDeEvolucao: Int = 0
 
     // Um acessório conta como talismã (efeito passivo, estilo Elden Ring)
     // se mexer em qualquer um dos campos de efeito de talismã — os
@@ -172,6 +178,27 @@ struct Item: Codable, Identifiable {
         bonus.regenVidaPorTurno != 0 || bonus.regenEnergiaPorTurno != 0
             || bonus.bonusOuroPercentual != 0 || bonus.bonusChanceDeItemPercentual != 0
             || bonus.bonusRaridadeDeItem != 0
+    }
+
+    static let nivelMaximoDeEvolucao = 10
+
+    // Bônus efetivo do item já considerando a evolução na Forja: cada nível
+    // soma +8% sobre os atributos base da peça (até +80% no nível máximo).
+    // Itens não evoluídos (a esmagadora maioria, incluindo tudo que não é
+    // arma/armadura) têm `nivelDeEvolucao == 0` e retornam `bonus` puro.
+    var bonusEvoluido: BonusDeAtributos {
+        guard nivelDeEvolucao > 0 else { return bonus }
+        let multiplicador = 1.0 + Double(nivelDeEvolucao) * 0.08
+        var escalado = bonus
+        escalado.forca = Int(Double(bonus.forca) * multiplicador)
+        escalado.vitalidade = Int(Double(bonus.vitalidade) * multiplicador)
+        escalado.inteligencia = Int(Double(bonus.inteligencia) * multiplicador)
+        escalado.destreza = Int(Double(bonus.destreza) * multiplicador)
+        escalado.agilidade = Int(Double(bonus.agilidade) * multiplicador)
+        escalado.sorte = Int(Double(bonus.sorte) * multiplicador)
+        escalado.defesa = Int(Double(bonus.defesa) * multiplicador)
+        escalado.energia = Int(Double(bonus.energia) * multiplicador)
+        return escalado
     }
 
     var descricao: String {
@@ -189,7 +216,8 @@ struct Item: Codable, Identifiable {
             case .none: return ""
             }
         case .arma, .armadura, .acessorio:
-            return bonus.descricaoCurta
+            let base = bonus.descricaoCurta
+            return nivelDeEvolucao > 0 ? "\(base) (+\(nivelDeEvolucao): \(bonusEvoluido.descricaoCurta))" : base
         case .material:
             return zonaDeOrigem != nil
                 ? "Material raro — entregue em missões de coleta ou venda por Runas."
@@ -201,7 +229,7 @@ struct Item: Codable, Identifiable {
          classeRestrita: ClasseDePersonagem? = nil, efeitoDePocao: EfeitoDePocao? = nil,
          nivelMinimo: Int = 1, bonus: BonusDeAtributos = BonusDeAtributos(),
          habilidadeDeArma: Magia? = nil, efeitoDeBuffTemporario: Magia? = nil,
-         zonaDeOrigem: String? = nil) {
+         zonaDeOrigem: String? = nil, nivelDeEvolucao: Int = 0) {
         self.nome = nome
         self.tipo = tipo
         self.valor = valor
@@ -214,6 +242,7 @@ struct Item: Codable, Identifiable {
         self.habilidadeDeArma = habilidadeDeArma
         self.efeitoDeBuffTemporario = efeitoDeBuffTemporario
         self.zonaDeOrigem = zonaDeOrigem
+        self.nivelDeEvolucao = nivelDeEvolucao
     }
 
     // Decodificação tolerante: itens salvos antes do sistema de bônus por
@@ -246,6 +275,7 @@ struct Item: Codable, Identifiable {
         zonaDeOrigem = try c.decodeIfPresent(String.self, forKey: .zonaDeOrigem)
         habilidadeDeArma = try c.decodeIfPresent(Magia.self, forKey: .habilidadeDeArma) ?? nil
         efeitoDeBuffTemporario = try c.decodeIfPresent(Magia.self, forKey: .efeitoDeBuffTemporario) ?? nil
+        nivelDeEvolucao = try c.decodeIfPresent(Int.self, forKey: .nivelDeEvolucao) ?? 0
     }
 }
 
@@ -332,6 +362,11 @@ extension Item {
              habilidadeDeArma: Magia(nome: "Estocada Rápida", descricao: "Uma investida veloz com a lâmina.", icone: "bolt.fill", custoEnergia: 15, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .forca, multiplicadorDano: 1.3)),
         Item(nome: "Espada Longa", tipo: .arma, valor: 0, preco: 160, raridade: .incomum, classeRestrita: .guerreiro, nivelMinimo: 5, bonus: BonusDeAtributos(forca: 10, destreza: 3),
              habilidadeDeArma: Magia(nome: "Corte Giratório", descricao: "Um golpe amplo com toda a força do braço.", icone: "tornado", custoEnergia: 22, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .forca, multiplicadorDano: 1.8)),
+        // Build de Tank: a única arma do Guerreiro que dá Defesa, não só
+        // Força — abre mão de dano puro por sobrevivência, junto com
+        // Postura Defensiva/Brado do Campeão no grimório.
+        Item(nome: "Lâmina e Broquel", tipo: .arma, valor: 0, preco: 170, raridade: .incomum, classeRestrita: .guerreiro, nivelMinimo: 5, bonus: BonusDeAtributos(forca: 7, defesa: 4),
+             habilidadeDeArma: Magia(nome: "Postura do Broquel", descricao: "Ergue o broquel, aumentando a defesa por alguns turnos.", icone: "shield.lefthalf.filled", custoEnergia: 24, nivelNecessario: 1, tipo: .fortalecimento, duracaoEmTurnos: 3, bonusDefesa: 6)),
         // Alternativa mais pesada à Espada Longa no mesmo patamar de nível —
         // troca Destreza por Força pura, pra quem quer bater mais forte e
         // não se importa de errar um pouco mais.
@@ -339,11 +374,19 @@ extension Item {
              habilidadeDeArma: Magia(nome: "Pisada Sísmica", descricao: "Um golpe de martelo que sacode o chão.", icone: "hammer.fill", custoEnergia: 30, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .forca, multiplicadorDano: 2.0)),
         Item(nome: "Machado de Guerra", tipo: .arma, valor: 0, preco: 280, raridade: .raro, classeRestrita: .guerreiro, nivelMinimo: 10, bonus: BonusDeAtributos(forca: 16, destreza: 5),
              habilidadeDeArma: Magia(nome: "Fenda-Terra", descricao: "Um golpe pesado que atordoa o alvo.", icone: "hammer.fill", custoEnergia: 35, nivelNecessario: 1, tipo: .atordoante, atributoDeEscala: .forca, multiplicadorDano: 1.6)),
+        // Build de Sangramento: serrilhado em vez de fio único, corta pra
+        // sangrar em vez de atordoar — a alternativa ofensiva ao Machado.
+        Item(nome: "Machado Serrilhado", tipo: .arma, valor: 0, preco: 290, raridade: .raro, classeRestrita: .guerreiro, nivelMinimo: 10, bonus: BonusDeAtributos(forca: 15, destreza: 2),
+             habilidadeDeArma: Magia(nome: "Corte Serrilhado", descricao: "Um corte irregular que abre feridas profundas.", icone: "drop.triangle.fill", custoEnergia: 32, nivelNecessario: 1, tipo: .sangramento, atributoDeEscala: .forca, multiplicadorDano: 1.5, acumuloDeStatus: 32)),
         // Meio-termo entre o Machado (L10) e a Lâmina do Campeão (L15) —
         // alcance maior, um pouco de Vitalidade extra pra sobreviver ao
         // corpo a corpo mais tempo.
         Item(nome: "Alabarda Rúnica", tipo: .arma, valor: 0, preco: 360, raridade: .raro, classeRestrita: .guerreiro, nivelMinimo: 13, bonus: BonusDeAtributos(forca: 20, vitalidade: 3, destreza: 4),
              habilidadeDeArma: Magia(nome: "Varredura Rúnica", descricao: "Um golpe amplo que atinge com força bruta.", icone: "wind", custoEnergia: 38, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .forca, multiplicadorDano: 2.1)),
+        // Build de Lança: alcance e precisão em vez de força bruta — a
+        // estocada nunca erra o alvo, o oposto da filosofia da Alabarda.
+        Item(nome: "Lança Longa", tipo: .arma, valor: 0, preco: 370, raridade: .raro, classeRestrita: .guerreiro, nivelMinimo: 13, bonus: BonusDeAtributos(forca: 18, destreza: 6),
+             habilidadeDeArma: Magia(nome: "Estocada Precisa", descricao: "Uma estocada de longo alcance que nunca erra o alvo.", icone: "scope", custoEnergia: 36, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .forca, multiplicadorDano: 1.9, sempreAcerta: true)),
         Item(nome: "Lâmina do Campeão", tipo: .arma, valor: 0, preco: 450, raridade: .epico, classeRestrita: .guerreiro, nivelMinimo: 15, bonus: BonusDeAtributos(forca: 24, destreza: 7),
              habilidadeDeArma: Magia(nome: "Lâmina Sangrenta", descricao: "Corta fundo, abrindo um sangramento.", icone: "drop.triangle.fill", custoEnergia: 40, nivelNecessario: 1, tipo: .danoComEfeito, atributoDeEscala: .forca, multiplicadorDano: 1.4, multiplicadorDanoPorTurno: 0.7, duracaoEmTurnos: 3)),
         Item(nome: "Espada do Titã Ancestral", tipo: .arma, valor: 0, preco: 700, raridade: .epico, classeRestrita: .guerreiro, nivelMinimo: 18, bonus: BonusDeAtributos(forca: 32, vitalidade: 5, destreza: 9),
@@ -359,14 +402,26 @@ extension Item {
         // dano direto.
         Item(nome: "Tomo Sombrio", tipo: .arma, valor: 0, preco: 220, raridade: .raro, classeRestrita: .mago, nivelMinimo: 7, bonus: BonusDeAtributos(inteligencia: 14, destreza: 1),
              habilidadeDeArma: Magia(nome: "Praga Sussurrada", descricao: "Uma maldição que corrói o alvo aos poucos.", icone: "drop.fill", custoEnergia: 28, nivelNecessario: 1, tipo: .danoComEfeito, atributoDeEscala: .inteligencia, multiplicadorDano: 1.0, multiplicadorDanoPorTurno: 0.6, duracaoEmTurnos: 3)),
+        // Build de Fogo: junto com Chama Ardente/Explosão Flamejante no
+        // grimório, esse cajado já carrega a queimadura como Golpe de Arma.
+        Item(nome: "Cajado das Chamas", tipo: .arma, valor: 0, preco: 225, raridade: .raro, classeRestrita: .mago, nivelMinimo: 7, bonus: BonusDeAtributos(inteligencia: 15),
+             habilidadeDeArma: Magia(nome: "Toque Flamejante", descricao: "Um toque em brasa que queima e corrói a defesa do alvo.", icone: "flame.fill", custoEnergia: 26, nivelNecessario: 1, tipo: .queimadura, atributoDeEscala: .inteligencia, multiplicadorDano: 0.9, multiplicadorDanoPorTurno: 0.4, duracaoEmTurnos: 3, reducaoDeDefesaPercentual: 15)),
         Item(nome: "Cetro Arcano", tipo: .arma, valor: 0, preco: 280, raridade: .raro, classeRestrita: .mago, nivelMinimo: 10, bonus: BonusDeAtributos(inteligencia: 18, destreza: 5),
              habilidadeDeArma: Magia(nome: "Gélido Cortante", descricao: "Um golpe de gelo que atordoa o alvo.", icone: "snowflake", custoEnergia: 38, nivelNecessario: 1, tipo: .atordoante, atributoDeEscala: .inteligencia, multiplicadorDano: 1.5)),
+        // Build de Gelo: junto com Lança de Gelo/Nova Glacial no grimório,
+        // esse cajado acumula calafrio a cada Golpe de Arma.
+        Item(nome: "Cajado Glacial", tipo: .arma, valor: 0, preco: 285, raridade: .raro, classeRestrita: .mago, nivelMinimo: 10, bonus: BonusDeAtributos(inteligencia: 19, destreza: 4),
+             habilidadeDeArma: Magia(nome: "Toque Glacial", descricao: "Um toque congelante que acumula calafrio no alvo.", icone: "snowflake", custoEnergia: 36, nivelNecessario: 1, tipo: .calafrio, atributoDeEscala: .inteligencia, multiplicadorDano: 1.3, acumuloDeStatus: 30)),
         // Meio-termo entre o Cetro Arcano (L10) e o Bastão dos Videntes
         // (L15) — dá um pouco de Energia extra além do dano puro.
         Item(nome: "Cristal do Abismo", tipo: .arma, valor: 0, preco: 360, raridade: .raro, classeRestrita: .mago, nivelMinimo: 13, bonus: BonusDeAtributos(inteligencia: 22, destreza: 4, energia: 15),
              habilidadeDeArma: Magia(nome: "Fenda do Abismo", descricao: "Uma explosão de energia vinda do abismo.", icone: "sparkles", custoEnergia: 45, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .inteligencia, multiplicadorDano: 2.3)),
         Item(nome: "Bastão dos Videntes", tipo: .arma, valor: 0, preco: 450, raridade: .epico, classeRestrita: .mago, nivelMinimo: 15, bonus: BonusDeAtributos(inteligencia: 26, destreza: 7),
              habilidadeDeArma: Magia(nome: "Chama Persistente", descricao: "Fogo arcano que continua queimando o alvo.", icone: "flame.fill", custoEnergia: 42, nivelNecessario: 1, tipo: .danoComEfeito, atributoDeEscala: .inteligencia, multiplicadorDano: 1.3, multiplicadorDanoPorTurno: 0.6, duracaoEmTurnos: 3)),
+        // Build de Fogo (assinatura): junto com Explosão Flamejante no
+        // grimório, o topo da build de queimadura do mago.
+        Item(nome: "Cetro do Inferno", tipo: .arma, valor: 0, preco: 460, raridade: .epico, classeRestrita: .mago, nivelMinimo: 15, bonus: BonusDeAtributos(inteligencia: 27, destreza: 5),
+             habilidadeDeArma: Magia(nome: "Erupção Infernal", descricao: "Fogo devastador que queima e corrói profundamente a defesa do alvo.", icone: "flame.fill", custoEnergia: 46, nivelNecessario: 1, tipo: .queimadura, atributoDeEscala: .inteligencia, multiplicadorDano: 1.6, multiplicadorDanoPorTurno: 0.7, duracaoEmTurnos: 4, reducaoDeDefesaPercentual: 28)),
         Item(nome: "Cetro do Vazio Eterno", tipo: .arma, valor: 0, preco: 700, raridade: .epico, classeRestrita: .mago, nivelMinimo: 17, bonus: BonusDeAtributos(inteligencia: 36, destreza: 9, energia: 20),
              habilidadeDeArma: Magia(nome: "Colapso do Vazio", descricao: "Uma implosão arcana certeira que rasga o alvo.", icone: "smallcircle.filled.circle.fill", custoEnergia: 58, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .inteligencia, multiplicadorDano: 3.4, sempreAcerta: true)),
 
@@ -380,8 +435,16 @@ extension Item {
         // patamar dos Punhais Sombrios — menos crítico, mais acerto.
         Item(nome: "Kunais Gêmeas", tipo: .arma, valor: 0, preco: 220, raridade: .raro, classeRestrita: .ladino, nivelMinimo: 7, bonus: BonusDeAtributos(destreza: 8, agilidade: 12),
              habilidadeDeArma: Magia(nome: "Chuva de Kunais", descricao: "Uma saraivada rápida de lâminas arremessadas.", icone: "wind", custoEnergia: 26, nivelNecessario: 1, tipo: .dano, atributoDeEscala: .agilidade, multiplicadorDano: 2.0)),
+        // Build de Sangramento: junto com Corte Retalhante no grimório, a
+        // segunda opção ofensiva do ladino ao lado do veneno.
+        Item(nome: "Facas Serrilhadas", tipo: .arma, valor: 0, preco: 225, raridade: .raro, classeRestrita: .ladino, nivelMinimo: 7, bonus: BonusDeAtributos(destreza: 7, agilidade: 13),
+             habilidadeDeArma: Magia(nome: "Corte Serrilhado", descricao: "Cortes rasos e rápidos que acumulam sangramento.", icone: "drop.triangle.fill", custoEnergia: 24, nivelNecessario: 1, tipo: .sangramento, atributoDeEscala: .agilidade, multiplicadorDano: 1.3, acumuloDeStatus: 28)),
         Item(nome: "Lâminas do Vento", tipo: .arma, valor: 0, preco: 280, raridade: .raro, classeRestrita: .ladino, nivelMinimo: 10, bonus: BonusDeAtributos(inteligencia: 5, destreza: 6, agilidade: 16),
              habilidadeDeArma: Magia(nome: "Rajada Cortante", descricao: "Um corte veloz que desequilibra o alvo.", icone: "wind.snow", custoEnergia: 32, nivelNecessario: 1, tipo: .atordoante, atributoDeEscala: .agilidade, multiplicadorDano: 1.55)),
+        // Build de Gelo: junto com Lâmina Congelante no grimório, a terceira
+        // identidade ofensiva do ladino (veneno, sangramento e agora gelo).
+        Item(nome: "Lâminas Congelantes", tipo: .arma, valor: 0, preco: 285, raridade: .raro, classeRestrita: .ladino, nivelMinimo: 10, bonus: BonusDeAtributos(destreza: 5, agilidade: 17),
+             habilidadeDeArma: Magia(nome: "Toque Congelante", descricao: "Um corte gélido que acumula calafrio no alvo.", icone: "snowflake", custoEnergia: 30, nivelNecessario: 1, tipo: .calafrio, atributoDeEscala: .agilidade, multiplicadorDano: 1.25, acumuloDeStatus: 26)),
         // Meio-termo entre as Lâminas do Vento (L10) e as Presas da Víbora
         // (L15) — aposta em veneno mais cedo, pra quem quer jogar de
         // controle em vez de dano direto.
@@ -523,5 +586,39 @@ extension Item {
 
     static func materialDaZona(_ zona: String) -> Item? {
         materiaisDeZona.first { $0.zonaDeOrigem == zona }
+    }
+
+    // MARK: - Pedras de Forja (evolução de arma/armadura)
+
+    // Uma pedra por raridade — a mesma escala usada pelo loot de
+    // equipamento (`lootAleatorio`), então uma arma Rara sempre pede Pedra
+    // de Forja Rara pra evoluir, nunca uma tier desencontrada. Só dropam
+    // (ver `Personagem.receberRecompensa`), nunca compram — é sempre um
+    // troféu de exploração/combate, como os materiais de zona.
+    static let pedrasDeForja: [Item] = [
+        Item(nome: "Pedra de Forja Comum", tipo: .material, valor: 0, preco: 20, raridade: .comum),
+        Item(nome: "Pedra de Forja Incomum", tipo: .material, valor: 0, preco: 45, raridade: .incomum),
+        Item(nome: "Pedra de Forja Rara", tipo: .material, valor: 0, preco: 90, raridade: .raro),
+        Item(nome: "Pedra de Forja Épica", tipo: .material, valor: 0, preco: 160, raridade: .epico)
+    ]
+
+    static func pedraDeForja(paraRaridade raridade: Raridade) -> Item {
+        pedrasDeForja.first { $0.raridade == raridade } ?? pedrasDeForja[0]
+    }
+
+    // Qual tier de Pedra de Forja dropa de um inimigo de um certo nível —
+    // usa exatamente as mesmas faixas de `lootAleatorio`, pra que a pedra
+    // que cai numa zona sempre corresponda à raridade do equipamento que
+    // também cai lá.
+    static func pedraDeForja(paraNivelInimigo nivel: Int) -> Item {
+        let ordem: [Raridade] = [.comum, .incomum, .raro, .epico]
+        let indice: Int
+        switch nivel {
+        case ..<4: indice = 0
+        case 4..<8: indice = 1
+        case 8..<13: indice = 2
+        default: indice = 3
+        }
+        return pedraDeForja(paraRaridade: ordem[indice])
     }
 }

@@ -100,6 +100,13 @@ struct Personagem: Codable {
 
     static let numeroDeSlotsDeMagia = 3
     static let numeroDeSlotsDeAcessorio = 3
+    // Limites do Frasco Sagrado: sem teto, Sementes/Lágrimas compradas ou
+    // achadas sem parar deixariam o herói praticamente imortal. Com um
+    // total fixo de cargas pra distribuir e uma potência máxima, o upgrade
+    // continua valioso (permite escolher Vida vs. Energia) sem quebrar o
+    // combate.
+    static let cargasDeFrascoMaximo = 12
+    static let potenciaDoFrascoMaxima = 100
 
     init(nome: String, classe: ClasseDePersonagem) {
         self.id = UUID()
@@ -273,7 +280,7 @@ struct Personagem: Codable {
     // atributo/derivado que precise somar bônus passa por aqui, então a
     // Rúnica automaticamente "conta" em tudo que o equipamento já conta.
     private var bonusAtivos: [BonusDeAtributos] {
-        itensEquipados.map { $0.bonus } + [bonusDeRunicaAtiva]
+        itensEquipados.map { $0.bonusEvoluido } + [bonusDeRunicaAtiva]
     }
 
     var forcaTotal: Int {
@@ -818,6 +825,13 @@ struct Personagem: Codable {
         if Int.random(in: 1...100) <= 8, let quinquilharia = Item.materiaisGenericos.randomElement() {
             adicionarItem(quinquilharia)
         }
+        // Pedra de Forja: alimenta a Forja (ver `evoluirArmaEquipada`), com
+        // rolagem independente das demais — assim como o material de zona,
+        // nunca compete pela mesma chance do loot de equipamento.
+        let chanceDePedra = min(100, (inimigo.chefe ? 55 : (inimigo.elite ? 35 : 15)) + bonusChanceDeItemTotal / 2)
+        if Int.random(in: 1...100) <= chanceDePedra {
+            adicionarItem(Item.pedraDeForja(paraNivelInimigo: inimigo.nivel))
+        }
 
         var novaRunica: String? = nil
         if inimigo.chefe && !runicasConquistadas.contains(inimigo.zonaOrigem) {
@@ -851,6 +865,9 @@ struct Personagem: Codable {
 
         if Int.random(in: 1...100) <= 25, let material = Item.materialDaZona(zonaNome) {
             adicionarItem(material)
+        }
+        if Int.random(in: 1...100) <= 12 {
+            adicionarItem(Item.pedraDeForja(paraNivelInimigo: nivelZona))
         }
         return (runasGanhas, itemGanho)
     }
@@ -887,7 +904,14 @@ struct Personagem: Codable {
 
     // Adiciona um item: se já existe uma pilha igual, soma 1; senão cria nova
     mutating func adicionarItem(_ item: Item) {
-        if let indice = inventario.firstIndex(where: { $0.item.nome == item.nome }) {
+        // Também compara `nivelDeEvolucao`: uma arma já reforçada na Forja
+        // nunca pode se misturar numa pilha com uma cópia comum do mesmo
+        // nome (senão devolver uma arma evoluída pra mochila — ao trocar
+        // de equipamento — apagaria silenciosamente o reforço ao empilhar
+        // com uma cópia +0 já existente).
+        if let indice = inventario.firstIndex(where: {
+            $0.item.nome == item.nome && $0.item.nivelDeEvolucao == item.nivelDeEvolucao
+        }) {
             inventario[indice].quantidade += 1
         } else {
             inventario.append(PilhaDeItens(item: item, quantidade: 1))
@@ -921,17 +945,25 @@ struct Personagem: Codable {
         case .aumentaFrascos:
             // Semente Dourada: mais cargas totais (quantidade), não mais
             // força de cura — isso é a Lágrima Sagrada, logo abaixo.
-            cargasDeFrascoTotal += item.valor
-            frascosDeVidaAlocados += item.valor
-            frascosDeVidaAtuais += item.valor
+            guard cargasDeFrascoTotal < Personagem.cargasDeFrascoMaximo else {
+                return "O Frasco Sagrado já está no limite máximo de \(Personagem.cargasDeFrascoMaximo) cargas."
+            }
+            let incremento = min(item.valor, Personagem.cargasDeFrascoMaximo - cargasDeFrascoTotal)
+            cargasDeFrascoTotal += incremento
+            frascosDeVidaAlocados += incremento
+            frascosDeVidaAtuais += incremento
             diminuirPilha(emIndice: indice)
-            return "Você consumiu \(item.nome)! Total de cargas do Frasco Sagrado: \(cargasDeFrascoTotal)."
+            return "Você consumiu \(item.nome)! Total de cargas do Frasco Sagrado: \(cargasDeFrascoTotal)/\(Personagem.cargasDeFrascoMaximo)."
         case .aumentaPotenciaDoFrasco:
             // Lágrima Sagrada: mais força de cura/restauração por uso, não
             // mais cargas — o par da Semente Dourada.
-            potenciaDoFrasco += item.valor
+            guard potenciaDoFrasco < Personagem.potenciaDoFrascoMaxima else {
+                return "O Frasco Sagrado já está na potência máxima de \(Personagem.potenciaDoFrascoMaxima)%."
+            }
+            let incremento = min(item.valor, Personagem.potenciaDoFrascoMaxima - potenciaDoFrasco)
+            potenciaDoFrasco += incremento
             diminuirPilha(emIndice: indice)
-            return "Você consumiu \(item.nome)! O Frasco Sagrado agora cura/restaura +\(item.valor)% a mais por uso."
+            return "Você consumiu \(item.nome)! O Frasco Sagrado agora cura/restaura +\(incremento)% a mais por uso (total: \(potenciaDoFrasco)%)."
         case .fortalecimento:
             // O buff em si (`item.efeitoDeBuffTemporario`) só é aplicado
             // por `TelaDeCombate.usarItem`, que tem acesso ao estado de
@@ -1007,6 +1039,58 @@ struct Personagem: Codable {
         case .pocao, .material:
             return "Isso não é um equipamento."
         }
+    }
+
+    // MARK: - Forja (evolução de arma/armadura)
+
+    // Custo pra levar uma peça do nível atual pro próximo: Pedras de Forja
+    // sobem 1 por nível (o 1º reforço custa 1, o 10º custa 10 — o topo exige
+    // ter farmado de verdade, não só ter tido sorte uma vez), sempre da
+    // mesma tier da raridade da peça (ver `Item.pedraDeForja(paraRaridade:)`).
+    // Público (não só usado por `evoluir`) pra a tela da Vila conseguir
+    // mostrar o custo antes do jogador confirmar.
+    func custoParaEvoluir(_ item: Item) -> (pedra: Item, quantidadePedra: Int, custoRunas: Int) {
+        (Item.pedraDeForja(paraRaridade: item.raridade), item.nivelDeEvolucao + 1, 80 + item.nivelDeEvolucao * 60)
+    }
+
+    // Evolui a peça equipada no slot indicado (arma ou armadura), consumindo
+    // Pedras de Forja da tier da raridade dela + Runas. O bônus efetivo já
+    // reflete o novo nível imediatamente (ver `Item.bonusEvoluido`), sem
+    // precisar reequipar. Só a peça EQUIPADA evolui — nunca uma cópia parada
+    // na mochila — pra não ambiguar qual unidade de uma pilha está sendo
+    // reforçada.
+    private mutating func evoluir(_ slot: inout Item?, nomeParaFalta: String) -> String {
+        guard var item = slot else { return nomeParaFalta }
+        guard item.tipo == .arma || item.tipo == .armadura else {
+            return "Só armas e armaduras podem ser evoluídas na Forja."
+        }
+        guard item.nivelDeEvolucao < Item.nivelMaximoDeEvolucao else {
+            return "\(item.nome) já está no nível máximo de evolução (+\(Item.nivelMaximoDeEvolucao))."
+        }
+
+        let (pedra, quantidadePedra, custoRunas) = custoParaEvoluir(item)
+
+        guard quantidadeDoItem(nome: pedra.nome) >= quantidadePedra else {
+            return "Faltam \(pedra.nome) para evoluir \(item.nome) (\(quantidadeDoItem(nome: pedra.nome))/\(quantidadePedra))."
+        }
+        guard ouro >= custoRunas else {
+            return "Runas insuficientes! A Forja cobra \(custoRunas) Runas para esse reforço."
+        }
+
+        removerQuantidade(doItemNomeado: pedra.nome, quantidade: quantidadePedra)
+        ouro -= custoRunas
+        item.nivelDeEvolucao += 1
+        slot = item
+        recalcularMaximos()
+        return "\(item.nome) evoluiu para +\(item.nivelDeEvolucao)! Novo bônus: \(item.bonusEvoluido.descricaoCurta)."
+    }
+
+    mutating func evoluirArmaEquipada() -> String {
+        evoluir(&armaEquipada, nomeParaFalta: "Você precisa equipar uma arma antes de evoluí-la na Forja.")
+    }
+
+    mutating func evoluirArmaduraEquipada() -> String {
+        evoluir(&armaduraEquipada, nomeParaFalta: "Você precisa equipar uma armadura antes de evoluí-la na Forja.")
     }
 
     // Desequipa o talismã de um slot específico e devolve ele para a mochila.

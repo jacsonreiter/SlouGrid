@@ -262,9 +262,14 @@ struct TelaDeEquipamento: View {
                                 .foregroundColor(item.raridade.cor)
                                 .cornerRadius(6)
                         }
-                        Text(item.bonus.descricaoCurta)
+                        Text(item.nivelDeEvolucao > 0 ? item.bonusEvoluido.descricaoCurta : item.bonus.descricaoCurta)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        if item.nivelDeEvolucao > 0 {
+                            Text("Forjado +\(item.nivelDeEvolucao)")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
                         // Ash of War: o Golpe de Arma da peça, só relevante
                         // para armas.
                         if tipo == .arma, let habilidade = item.habilidadeDeArma {

@@ -120,10 +120,78 @@ struct TelaDaVila: View {
             ForEach(missoesVisiveis(pnj)) { missao in
                 missaoLinha(missao)
             }
+
+            if pnj.id == "kael" {
+                forjaBox
+            }
         }
         .padding()
         .background(Color.gray.opacity(0.08))
         .cornerRadius(12)
+    }
+
+    // A Forja do Kael: evolui a arma/armadura EQUIPADA consumindo Pedras de
+    // Forja (dropam explorando/combatendo, ver `Item.pedraDeForja`) + Runas
+    // — assim o equipamento não nasce no teto já ao comprar/equipar, precisa
+    // ser investido aos poucos, como pedido.
+    var forjaBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Forja").font(.subheadline).fontWeight(.bold)
+            linhaDeForja(nome: "Arma", item: vm.heroi.armaEquipada) {
+                mensagem = vm.heroi.evoluirArmaEquipada()
+            }
+            linhaDeForja(nome: "Armadura", item: vm.heroi.armaduraEquipada) {
+                mensagem = vm.heroi.evoluirArmaduraEquipada()
+            }
+        }
+        .padding(10)
+        .background(Color.orange.opacity(0.08))
+        .cornerRadius(10)
+    }
+
+    @ViewBuilder
+    func linhaDeForja(nome: String, item: Item?, evoluir: @escaping () -> Void) -> some View {
+        if let item = item {
+            let noMaximo = item.nivelDeEvolucao >= Item.nivelMaximoDeEvolucao
+            let (pedra, quantidadePedra, custoRunas) = vm.heroi.custoParaEvoluir(item)
+            let quantidadeAtual = vm.heroi.quantidadeDoItem(nome: pedra.nome)
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("\(nome): \(item.nome) +\(item.nivelDeEvolucao)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    if !noMaximo {
+                        Button("Evoluir") { evoluir() }
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                    }
+                }
+                if noMaximo {
+                    Text("Nível máximo de evolução (+\(Item.nivelMaximoDeEvolucao)).")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Requer \(quantidadeAtual)/\(quantidadePedra) \(pedra.nome) + \(custoRunas) Runas")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(8)
+            .background(Color.gray.opacity(0.06))
+            .cornerRadius(8)
+        } else {
+            Text("\(nome): nenhuma equipada.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(8)
+        }
     }
 
     func missaoLinha(_ missao: Missao) -> some View {

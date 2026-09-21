@@ -32,11 +32,26 @@ struct TelaDeCombate: View {
     // mesmo tempo num grupo.
     @State private var venenoPorAlvo: [Int: (dano: Int, turnos: Int)] = [:]
     @State private var atordoadoPorAlvo: Set<Int> = []
+    // Sangramento/Calafrio (estilo Bleed/Frostbite de Elden Ring): cada
+    // acerto do tipo soma um acúmulo; ao cruzar o limiar, o efeito
+    // "estoura" (explosão de dano proporcional à vida máxima do alvo, pro
+    // Sangramento; atordoamento imediato, pro Calafrio) e o acúmulo zera.
+    // Sem dano por turno — a ameaça é o próprio estouro, não um DoT.
+    @State private var sangramentoPorAlvo: [Int: Int] = [:]
+    @State private var calafrioPorAlvo: [Int: Int] = [:]
+    // Queimadura: dano por turno (como o veneno) + reduz a Defesa do alvo
+    // enquanto ativa — o "shred" que diferencia ela do veneno comum e dá ao
+    // mago de fogo uma identidade própria (abrir caminho pros aliados
+    // baterem mais forte, não só dano isolado).
+    @State private var queimaduraPorAlvo: [Int: (dano: Int, turnos: Int, reducaoDefesa: Int)] = [:]
+    private let limiarDeSangramento = 100
+    private let limiarDeCalafrio = 100
+    private let percentualExplosaoSangramento = 0.20
 
     // Golpe carregado do chefe (estilo "telegraph" de RPG por turnos, ver
     // `aplicarAtaqueDoChefe`) — só chefes fazem isso, e só existe um chefe
     // por combate (array de 1), então continuam sendo estado escalar.
-    @State private var turnosAteGolpeDoChefe = 3
+    @State private var turnosAteGolpeDoChefe = Int.random(in: 2...4)
     @State private var chefePrestesAGolpear = false
     // Depois de atordoado, o chefe fica 2 turnos imune a um novo
     // atordoamento — sem isso, uma magia atordoante recastada todo turno
@@ -137,6 +152,21 @@ struct TelaDeCombate: View {
                             Label("Atordoado", systemImage: "zzz")
                                 .font(.caption2)
                                 .foregroundColor(.yellow)
+                        }
+                        if let acumulo = sangramentoPorAlvo[indice] {
+                            Label("Sangrando (\(acumulo)/\(limiarDeSangramento))", systemImage: "drop.triangle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                        }
+                        if let acumulo = calafrioPorAlvo[indice] {
+                            Label("Calafrio (\(acumulo)/\(limiarDeCalafrio))", systemImage: "snowflake")
+                                .font(.caption2)
+                                .foregroundColor(.cyan)
+                        }
+                        if queimaduraPorAlvo[indice] != nil {
+                            Label("Queimando", systemImage: "flame.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
                         }
                         if inimigoDaLista.chefe && chefePrestesAGolpear {
                             Label("Carregando golpe!", systemImage: "exclamationmark.triangle.fill")
@@ -553,7 +583,10 @@ struct TelaDeCombate: View {
         indiceAlvo = 0
         venenoPorAlvo = [:]
         atordoadoPorAlvo = []
-        turnosAteGolpeDoChefe = 3
+        sangramentoPorAlvo = [:]
+        calafrioPorAlvo = [:]
+        queimaduraPorAlvo = [:]
+        turnosAteGolpeDoChefe = Int.random(in: 2...4)
         chefePrestesAGolpear = false
         turnosDeImunidadeAAtordoamento = 0
         bonusForcaTemporario = 0
@@ -598,6 +631,27 @@ struct TelaDeCombate: View {
         indiceAlvo = indice
     }
 
+    // Defesa real do alvo no momento do golpe: a Queimadura reduz a Defesa
+    // da própria placa/armadura enquanto ativa (ver `queimaduraPorAlvo`),
+    // então todo cálculo de dano físico/mágico passa por aqui em vez de ler
+    // `inimigos[indice].defesa` direto.
+    private func defesaEfetiva(doAlvo indice: Int) -> Int {
+        guard let queimadura = queimaduraPorAlvo[indice] else { return inimigos[indice].defesa }
+        return max(0, inimigos[indice].defesa * (100 - queimadura.reducaoDefesa) / 100)
+    }
+
+    // Limpa todo efeito temporário (veneno, atordoamento, sangramento,
+    // calafrio, queimadura) de um alvo — chamado sempre que ele morre, pra
+    // um efeito que ainda estava acumulando/ativo não "vazar" pro próximo
+    // inimigo que vier a ocupar o mesmo índice do array.
+    private func limparEfeitosDoAlvo(_ indice: Int) {
+        venenoPorAlvo[indice] = nil
+        atordoadoPorAlvo.remove(indice)
+        sangramentoPorAlvo[indice] = nil
+        calafrioPorAlvo[indice] = nil
+        queimaduraPorAlvo[indice] = nil
+    }
+
     private func atacar() {
         guard !combateEncerrado, inimigoAlvo != nil else { return }
         guard rolarAcerto() else {
@@ -613,7 +667,7 @@ struct TelaDeCombate: View {
     // como a Defesa do herói já funciona em `Personagem.sofrerDano`.
     private func aplicarDanoBasicoAoAlvo(_ danoBruto: Int, critico: Bool) {
         let indice = indiceAlvo
-        let danoFinal = max(1, danoBruto - inimigos[indice].defesa)
+        let danoFinal = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
         inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoFinal)
         let nomeAlvo = inimigos[indice].nome
         log.append(critico
@@ -623,8 +677,7 @@ struct TelaDeCombate: View {
 
         if !inimigos[indice].estaVivo {
             log.append("\(nomeAlvo) foi derrotado!")
-            venenoPorAlvo[indice] = nil
-            atordoadoPorAlvo.remove(indice)
+            limparEfeitosDoAlvo(indice)
             avancarAlvoSeNecessario()
         }
 
@@ -686,12 +739,12 @@ struct TelaDeCombate: View {
         // `aplicarDanoBasicoAoAlvo`) — o veneno/dano por turno logo abaixo
         // fica de fora de propósito, como o sangramento/veneno de Elden
         // Ring, que ignora a armadura.
-        let danoFinal = max(1, danoBruto - inimigos[indice].defesa)
+        let danoFinal = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
         inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoFinal)
         let nomeAlvo = inimigos[indice].nome
         var texto = "Você usou \(magia.nome) e causou \(danoFinal) de dano em \(nomeAlvo)!"
 
-        let alvoAindaVivo = inimigos[indice].estaVivo
+        var alvoAindaVivo = inimigos[indice].estaVivo
         if alvoAindaVivo && magia.tipo == .danoComEfeito {
             let danoPorTurno = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
             venenoPorAlvo[indice] = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos)
@@ -707,7 +760,46 @@ struct TelaDeCombate: View {
                 atordoadoPorAlvo.insert(indice)
                 texto += " \(nomeAlvo) ficou atordoado!"
             }
+        } else if alvoAindaVivo && magia.tipo == .sangramento {
+            let acumulo = magia.acumuloDeStatus ?? 25
+            let totalAcumulado = (sangramentoPorAlvo[indice] ?? 0) + acumulo
+            if totalAcumulado >= limiarDeSangramento {
+                let explosao = max(1, Int(Double(inimigos[indice].vidaMaxima) * percentualExplosaoSangramento))
+                inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - explosao)
+                sangramentoPorAlvo[indice] = nil
+                texto += " O sangramento de \(nomeAlvo) explode, causando \(explosao) de dano!"
+            } else {
+                sangramentoPorAlvo[indice] = totalAcumulado
+                texto += " Sangramento se acumula em \(nomeAlvo) (\(totalAcumulado)/\(limiarDeSangramento))."
+            }
+        } else if alvoAindaVivo && magia.tipo == .calafrio {
+            let acumulo = magia.acumuloDeStatus ?? 25
+            let totalAcumulado = (calafrioPorAlvo[indice] ?? 0) + acumulo
+            if totalAcumulado >= limiarDeCalafrio {
+                calafrioPorAlvo[indice] = nil
+                if inimigos[indice].elite {
+                    texto += " Mas \(nomeAlvo) resiste ao calafrio acumulado — é forte demais!"
+                } else if inimigos[indice].chefe && turnosDeImunidadeAAtordoamento > 0 {
+                    texto += " O calafrio acumulado se dissipa, mas \(nomeAlvo) ainda resiste ao atordoamento!"
+                } else {
+                    atordoadoPorAlvo.insert(indice)
+                    texto += " O calafrio acumulado atordoa \(nomeAlvo)!"
+                }
+            } else {
+                calafrioPorAlvo[indice] = totalAcumulado
+                texto += " Calafrio se acumula em \(nomeAlvo) (\(totalAcumulado)/\(limiarDeCalafrio))."
+            }
+        } else if alvoAindaVivo && magia.tipo == .queimadura {
+            let danoPorTurno = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let reducao = magia.reducaoDeDefesaPercentual ?? 15
+            queimaduraPorAlvo[indice] = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos, reducaoDefesa: reducao)
+            texto += " \(nomeAlvo) está queimando, com a defesa reduzida em \(reducao)%."
         }
+
+        // A explosão do Sangramento (acima) pode matar o alvo depois do
+        // golpe inicial já ter "confirmado" ele vivo — reconfere antes do
+        // log/limpeza finais, senão a mensagem de derrota nunca aparece.
+        alvoAindaVivo = inimigos[indice].estaVivo
 
         if magia.valorCura > 0 {
             vm.heroi.vidaAtual = min(vm.heroi.vidaMaxima, vm.heroi.vidaAtual + magia.valorCura)
@@ -719,8 +811,7 @@ struct TelaDeCombate: View {
 
         if !alvoAindaVivo {
             log.append("\(nomeAlvo) foi derrotado!")
-            venenoPorAlvo[indice] = nil
-            atordoadoPorAlvo.remove(indice)
+            limparEfeitosDoAlvo(indice)
             avancarAlvoSeNecessario()
         }
 
@@ -851,10 +942,24 @@ struct TelaDeCombate: View {
             log.append("O veneno causa \(ativo.dano) de dano em \(inimigos[indice].nome).")
             if !inimigos[indice].estaVivo {
                 log.append("\(inimigos[indice].nome) sucumbiu ao veneno!")
-                venenoPorAlvo[indice] = nil
-                atordoadoPorAlvo.remove(indice)
+                limparEfeitosDoAlvo(indice)
             } else {
                 venenoPorAlvo[indice] = ativo.turnos <= 1 ? nil : (dano: ativo.dano, turnos: ativo.turnos - 1)
+            }
+        }
+
+        for indice in queimaduraPorAlvo.keys.sorted() {
+            guard indice < inimigos.count, inimigos[indice].estaVivo, let ativa = queimaduraPorAlvo[indice] else {
+                queimaduraPorAlvo[indice] = nil
+                continue
+            }
+            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - ativa.dano)
+            log.append("A queimadura causa \(ativa.dano) de dano em \(inimigos[indice].nome).")
+            if !inimigos[indice].estaVivo {
+                log.append("\(inimigos[indice].nome) sucumbiu às chamas!")
+                limparEfeitosDoAlvo(indice)
+            } else {
+                queimaduraPorAlvo[indice] = ativa.turnos <= 1 ? nil : (dano: ativa.dano, turnos: ativa.turnos - 1, reducaoDefesa: ativa.reducaoDefesa)
             }
         }
 
@@ -905,7 +1010,11 @@ struct TelaDeCombate: View {
     private func aplicarAtaqueDoChefe(indice: Int) {
         let vidaPercentual = Double(inimigos[indice].vidaAtual) / Double(max(1, inimigos[indice].vidaMaxima))
         let enfurecido = vidaPercentual <= 0.4
-        let turnosDeCarga = enfurecido ? 2 : 3
+        // Faixa em vez de valor fixo: um chefe previsível demais vira um
+        // padrão de memorização puro, não um combate de verdade — variar o
+        // tempo de carga (sem nunca sair da faixa "aprendível") mantém o
+        // telegraph honesto sem deixar o jogador decorar o timing exato.
+        let turnosDeCarga = enfurecido ? Int.random(in: 1...2) : Int.random(in: 2...4)
         let multiplicadorDoGolpe = enfurecido ? 2.6 : 2.2
 
         if chefePrestesAGolpear {

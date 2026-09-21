@@ -374,9 +374,10 @@ struct TelaDoPersonagem: View {
                     .foregroundColor(.green)
                 }
             } else if pilha.item.tipo == .material {
-                // Material de missão/comércio: não equipa nem se "usa",
-                // só entrega em missões (na Vila) ou vende aqui.
-                Text("Missão ou venda")
+                // Material de missão/Forja/comércio: não equipa nem se
+                // "usa" — só entrega em missões ou reforça equipamento na
+                // Forja (ambos na Vila), ou vende aqui.
+                Text("Forja, missão ou venda")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             } else {
