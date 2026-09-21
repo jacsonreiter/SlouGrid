@@ -566,10 +566,35 @@ struct Personagem: Codable {
 
     // MARK: - Combate por turnos
 
+    // Quanto um ponto investido no atributo de dano (Força/Inteligência/
+    // Agilidade, dependendo da classe/magia) realmente vale em combate —
+    // dois patamares de retorno decrescente, estilo os soft caps de Elden
+    // Ring (Vigor 40/60, Força/Destreza 54/80 etc.): valor cheio até o
+    // primeiro patamar, metade do valor até o segundo, um quinto depois
+    // disso. Isso é só sobre o quanto cada ponto CONTA no dano — o custo
+    // pra comprar o ponto (`custoEmRunas`) continua igual pra qualquer
+    // atributo, então focar tudo numa coisa só sempre dá mais dano puro que
+    // espalhar, mas com retorno cada vez menor, não crescimento linear pra
+    // sempre. Acerto/esquiva/crítico não precisam disso: já têm teto
+    // absoluto nas próprias fórmulas (`chanceDeAcerto` etc.).
+    static func valorEfetivoDeDano(_ bruto: Int) -> Double {
+        let primeiroPatamar = 40
+        let segundoPatamar = 70
+        if bruto <= primeiroPatamar {
+            return Double(bruto)
+        }
+        if bruto <= segundoPatamar {
+            return Double(primeiroPatamar) + Double(bruto - primeiroPatamar) * 0.5
+        }
+        let ateSegundoPatamar = Double(primeiroPatamar) + Double(segundoPatamar - primeiroPatamar) * 0.5
+        return ateSegundoPatamar + Double(bruto - segundoPatamar) * 0.2
+    }
+
     // Ataque básico: sempre disponível, com chance de crítico.
     // `bonusForca` inclui fortalecimentos temporários ativos só durante o combate.
     func calcularDanoBasico(bonusForca: Int = 0) -> (dano: Int, critico: Bool) {
-        var dano = forcaTotal + bonusForca + Int.random(in: -2...4)
+        let forcaEfetiva = Personagem.valorEfetivoDeDano(forcaTotal + bonusForca)
+        var dano = Int(forcaEfetiva) + Int.random(in: -2...4)
         let critico = Int.random(in: 1...100) <= chanceDeCriticoBasico
         if critico { dano = Int(Double(dano) * 1.8) }
         return (max(1, dano), critico)

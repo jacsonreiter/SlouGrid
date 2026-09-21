@@ -13,8 +13,18 @@ struct Zona: Identifiable {
     var iconeChefe: String
     var vitoriasParaChefe: Int = 3
 
+    // Teto de quanto a zona escala pra cima do nível do herói — estilo
+    // Elden Ring: inimigos não escalam pra sempre com você, só "acompanham"
+    // até um limite. Sem isso, um herói bem acima do nível da zona nunca
+    // sentiria que superou o lugar (o próprio "power fantasy" de voltar a
+    // uma área antiga e arrasar nela desaparece); com o teto, passado esse
+    // ponto a zona fica pra trás de verdade, e a recompensa (que usa o
+    // mesmo `nivel`) também para de acompanhar — não compensa mais treinar
+    // ali.
+    private static let alcanceDeEscalaAcimaDaZona = 6
+
     func gerarInimigoComum(nivelHeroi: Int) -> Inimigo {
-        let nivel = max(nivelBaseInimigos, nivelHeroi)
+        let nivel = min(nivelBaseInimigos + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos, nivelHeroi))
         let vida = 24 + nivel * 11
         return Inimigo(
             nome: nomesInimigos.randomElement() ?? nome,
@@ -32,7 +42,7 @@ struct Zona: Identifiable {
     }
 
     func gerarChefe(nivelHeroi: Int) -> Inimigo {
-        let nivel = max(nivelBaseInimigos + 4, nivelHeroi + 2)
+        let nivel = min(nivelBaseInimigos + 4 + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos + 4, nivelHeroi + 2))
         let vida = 70 + nivel * 18
         return Inimigo(
             nome: nomeChefe,

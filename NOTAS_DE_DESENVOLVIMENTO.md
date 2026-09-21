@@ -587,6 +587,70 @@ resumo do que voltou e como virou código:
   garantido depois de N explorações sem nada cair, técnica citada nas
   fontes pesquisadas pra evitar frustração de RNG ruim).
 
+## Rebalanceamento de dificuldade + exploração encadeada dentro da masmorra (sessão seguinte)
+
+Três pedidos do usuário: (1) resolver de vez a pergunta de criptografia do
+App Store Connect que aparecia a cada envio, (2) pesquisar como o Elden
+Ring equilibra a força dos inimigos pra não ficar fácil nem impossível, e
+(3) mudar "Continuar" depois de uma vitória pra não sair da masmorra —
+precisa ter Sair E Continuar, e Continuar deve ir pro próximo inimigo
+dentro da mesma visita, não voltar pro menu.
+
+- **Pergunta de criptografia resolvida via `Info.plist`** (era o que a
+  própria mensagem amarela do App Store Connect sugeria): adicionado
+  `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO` em Debug e Release no
+  `project.pbxproj` (o projeto usa `GENERATE_INFOPLIST_FILE = YES`, sem
+  arquivo `Info.plist` físico — por isso a chave via `INFOPLIST_KEY_*`, não
+  um plist editado à mão). Toda entrega futura pula essa pergunta.
+- **Pesquisei** (busca na web) os soft caps reais do Elden Ring antes de
+  mexer em número nenhum. Dois achados viraram código:
+  1. **Atributos têm dois patamares de retorno decrescente** (Vigor 40/60,
+     Força/Destreza 54/80 etc. — valor cheio até o 1º patamar, metade até
+     o 2º, bem pouco depois). Isso era uma lacuna real: o novo sistema de
+     evolução (custo por nível, sem soft cap por atributo, da sessão
+     anterior) deixava jogar 95 pontos só em Força sem penalidade nenhuma,
+     trivializando o jogo no fim. Adicionado
+     `Personagem.valorEfetivoDeDano(_:)` — dois patamares (40/70, valor
+     cheio / metade / 20%) aplicado só no atributo que dá DANO
+     (Força/Inteligência/Agilidade, tanto no ataque básico quanto nas
+     magias em `TelaDeCombate.lancarMagia`). Acerto/esquiva/crítico não
+     precisaram disso — já têm teto absoluto nas próprias fórmulas. O
+     custo em Runas continua igual pra qualquer atributo (não é sobre
+     "qual é mais barato", é sobre "quanto cada ponto realmente rende”).
+  2. **Inimigos no Elden Ring não escalam infinitamente com o jogador** —
+     são fixos por região, com escala parcial e limitada ao revisitar
+     áreas antigas, pra preservar a sensação de superar um lugar. Antes,
+     `Zona.gerarInimigoComum`/`gerarChefe` faziam
+     `max(nivelBaseInimigos, nivelHeroi)` — escalava pra sempre, sem teto,
+     então voltar a uma zona antiga nunca ficava fácil de verdade.
+     Adicionado `Zona.alcanceDeEscalaAcimaDaZona = 6`: agora
+     `min(nivelBaseInimigos + 6, max(nivelBaseInimigos, nivelHeroi))` —
+     escala com o jogador até 6 níveis acima da base da zona, depois para.
+     Como a recompensa usa o mesmo `nivel`, também para de compensar
+     treinar numa zona já superada.
+- **Exploração encadeada**: `TelaDeCombate.resultadoBox` agora mostra,
+  numa vitória, dois botões — "Sair da Masmorra" (sai, igual antes) e
+  "Continuar Explorando" (sorteia o próximo encontro com
+  `Zona.sortearEncontro()`, igual o botão Explorar das Masmorras, SEM sair
+  da tela). `continuarExplorando()` gera um novo inimigo (ou aplica uma
+  Descoberta direto, sem combate) e `iniciarNovoEncontro()` reseta o
+  estado de UM combate (veneno, atordoado, fortalecimentos, golpe de
+  chefe) sem tocar em vida/energia do herói, que continuam de onde
+  pararam — literalmente "ir mais fundo na masmorra" em vez de reiniciar.
+  Depois de vencer um chefe, Continuar nunca gera outro chefe (só
+  `sortearEncontro()`, que não inclui chefe). Derrota continua sem opção
+  de continuar (só "Voltar"). Isso também faz a Sequência de Exploração
+  (sessão anterior) fazer mais sentido — antes precisava voltar ao menu e
+  clicar Explorar de novo a cada luta pra manter a sequência; agora dá pra
+  simplesmente continuar.
+- Nenhum arquivo novo, nenhuma mudança em referências do
+  `project.pbxproj` (só a chave de criptografia, uma linha em cada
+  configuração). Validado só lendo o código (parênteses/colchetes/chaves
+  balanceados verificados via script) — sem Xcode/simulador neste
+  ambiente. **Ainda não jogado** — os números do soft cap (40/70) e do
+  teto de escala (+6 níveis) são estimativas informadas pela pesquisa, não
+  calibradas jogando de verdade.
+
 ## Ainda não feito / ideias em aberto
 
 - **Nenhum playtest real** dos números foi feito — tudo é estimativa

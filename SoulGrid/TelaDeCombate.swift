@@ -8,6 +8,9 @@ struct TelaDeCombate: View {
     let zona: Zona
     let contraChefe: Bool
     let elite: Bool
+    // Guardado (não só usado no init) porque "Continuar Explorando" gera
+    // um novo inimigo sem sair da tela — precisa do nível de novo.
+    let nivelHeroi: Int
 
     @State private var inimigo: Inimigo
     @State private var log: [String] = []
@@ -40,6 +43,7 @@ struct TelaDeCombate: View {
         self.zona = zona
         self.contraChefe = contraChefe
         self.elite = elite
+        self.nivelHeroi = nivelHeroi
         _inimigo = State(initialValue: contraChefe
             ? zona.gerarChefe(nivelHeroi: nivelHeroi)
             : (elite ? zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi) : zona.gerarInimigoComum(nivelHeroi: nivelHeroi)))
@@ -315,6 +319,11 @@ struct TelaDeCombate: View {
         .disabled(atuais <= 0 || combateEncerrado)
     }
 
+    // Depois de uma vitória (ou descoberta), o jogador escolhe: sair da
+    // masmorra com o que já ganhou, ou continuar explorando ali mesmo, sem
+    // voltar pro menu — encadeando encontros dentro da mesma visita, como
+    // um "delve" de roguelike. Só derrota não oferece continuar (a vida
+    // zerada não dá pra seguir; volte e descanse).
     var resultadoBox: some View {
         VStack(spacing: 12) {
             Image(systemName: vitoria ? "checkmark.seal.fill" : "xmark.seal.fill")
@@ -323,13 +332,35 @@ struct TelaDeCombate: View {
             Text(vitoria ? "Vitória!" : "Derrota")
                 .font(.title)
                 .fontWeight(.bold)
-            Button("Continuar") { dismiss() }
-                .font(.title3)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 10)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(12)
+
+            if vitoria {
+                HStack(spacing: 12) {
+                    Button("Sair da Masmorra") { dismiss() }
+                        .font(.subheadline)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+
+                    Button("Continuar Explorando") { continuarExplorando() }
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+            } else {
+                Button("Voltar") { dismiss() }
+                    .font(.title3)
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
         }
         .padding()
     }
@@ -404,6 +435,10 @@ struct TelaDeCombate: View {
 
     private func iniciarSeNecessario() {
         guard log.isEmpty else { return }
+        anunciarInimigo()
+    }
+
+    private func anunciarInimigo() {
         if inimigo.chefe {
             log.append("O chefe \(inimigo.nome) apareceu!")
         } else if inimigo.elite {
@@ -411,6 +446,53 @@ struct TelaDeCombate: View {
         } else {
             log.append("\(inimigo.nome) apareceu!")
         }
+    }
+
+    // "Continuar Explorando" (ver `resultadoBox`): sorteia o próximo
+    // encontro dentro da MESMA zona, sem sair da tela — reaproveita
+    // `Zona.sortearEncontro()`, a mesma variedade do botão "Explorar" das
+    // Masmorras. Depois de um chefe, o próximo encontro é sempre um
+    // encontro comum de exploração (nunca outro chefe).
+    private func continuarExplorando() {
+        switch zona.sortearEncontro() {
+        case .comum:
+            inimigo = zona.gerarInimigoComum(nivelHeroi: nivelHeroi)
+            iniciarNovoEncontro()
+        case .eliteDeCampo:
+            inimigo = zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi)
+            iniciarNovoEncontro()
+        case .descoberta:
+            let recompensa = vm.heroi.receberDescoberta(nivelZona: zona.nivelBaseInimigos)
+            var texto = "Você encontrou \(recompensa.runas) Runas explorando mais fundo, sem cruzar com nenhum inimigo."
+            if let item = recompensa.item {
+                texto += " Também achou: \(item.nome)!"
+            }
+            log.append(texto)
+            // Continua em "resultado" (combateEncerrado/vitoria já true) —
+            // o resultadoBox some de novo com Sair/Continuar.
+        }
+    }
+
+    // Reseta todo o estado de UM combate (efeitos, fortalecimentos, golpe
+    // de chefe) sem tocar no herói (vida/energia continuam de onde
+    // pararam) — é o que faz "Continuar Explorando" sentir como seguir
+    // fundo na masmorra, não um combate isolado novo.
+    private func iniciarNovoEncontro() {
+        combateEncerrado = false
+        vitoria = false
+        veneno = nil
+        inimigoAtordoado = false
+        turnosAteGolpeDoChefe = 3
+        chefePrestesAGolpear = false
+        bonusForcaTemporario = 0
+        turnosDeBonusForca = 0
+        bonusDefesaTemporaria = 0
+        turnosDeBonusDefesa = 0
+        bonusInteligenciaTemporaria = 0
+        turnosDeBonusInteligencia = 0
+        bonusAgilidadeTemporaria = 0
+        turnosDeBonusAgilidade = 0
+        anunciarInimigo()
     }
 
     // Destreza rege a chance de acerto — usada tanto pelo ataque básico
@@ -475,13 +557,16 @@ struct TelaDeCombate: View {
         }
 
         // O atributo que escala a magia depende da classe/magia (Força,
-        // Inteligência ou Agilidade), incluindo fortalecimentos ativos.
-        let atributoBase: Int
+        // Inteligência ou Agilidade), incluindo fortalecimentos ativos —
+        // mesmo soft cap de efetividade do ataque básico (ver
+        // `Personagem.valorEfetivoDeDano`).
+        let atributoBruto: Int
         switch magia.atributoDeEscala {
-        case .forca: atributoBase = vm.heroi.forcaTotal + bonusForcaTemporario
-        case .inteligencia: atributoBase = vm.heroi.inteligenciaTotal + bonusInteligenciaTemporaria
-        case .agilidade: atributoBase = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
+        case .forca: atributoBruto = vm.heroi.forcaTotal + bonusForcaTemporario
+        case .inteligencia: atributoBruto = vm.heroi.inteligenciaTotal + bonusInteligenciaTemporaria
+        case .agilidade: atributoBruto = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
         }
+        let atributoBase = Int(Personagem.valorEfetivoDeDano(atributoBruto))
 
         let danoBruto = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
         // Mesma mitigação de Defesa do ataque básico (ver `atacar()`) — o
