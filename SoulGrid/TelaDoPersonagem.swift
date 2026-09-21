@@ -76,6 +76,15 @@ struct TelaDoPersonagem: View {
                     .foregroundColor(.orange)
             }
             .font(.subheadline)
+
+            if vm.heroi.sequenciaDeExploracao > 0 {
+                HStack {
+                    Spacer()
+                    Label("Sequência \(vm.heroi.sequenciaDeExploracao) (+\(vm.heroi.bonusDeSequenciaPercentual)% Runas)", systemImage: "flame.fill")
+                        .foregroundColor(.orange)
+                }
+                .font(.caption)
+            }
         }
         .padding()
         .background(Color.gray.opacity(0.12))

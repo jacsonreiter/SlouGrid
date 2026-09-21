@@ -71,6 +71,14 @@ struct Personagem: Codable {
     var runicaSelecionada: String? = nil
     var runicaEquipadaAtiva: String? = nil
 
+    // Sequência de exploração: cada vitória ou descoberta sem descansar soma
+    // 1, e reseta ao descansar ou ser derrotado. Cada ponto aumenta as
+    // Runas ganhas (`bonusDeSequenciaPercentual`) — a tensão de "arriscar
+    // mais uma masmorra pela recompensa maior, ou recuar pra descansar com
+    // segurança" que jogos roguelike (Hades, Diablo) usam pra dar peso a
+    // continuar jogando em vez de parar a qualquer momento.
+    var sequenciaDeExploracao: Int = 0
+
     static let numeroDeSlotsDeMagia = 3
     static let numeroDeSlotsDeAcessorio = 3
 
@@ -113,7 +121,8 @@ struct Personagem: Codable {
              slotsDeMagias, pontosTotaisComprados,
              cargasDeFrascoTotal, frascosDeVidaAlocados, frascosDeEnergiaAlocados,
              frascosDeVidaAtuais, frascosDeEnergiaAtuais, potenciaDoFrasco,
-             runicasConquistadas, runicaSelecionada, runicaEquipadaAtiva
+             runicasConquistadas, runicaSelecionada, runicaEquipadaAtiva,
+             sequenciaDeExploracao
         case acessorioEquipadoLegado = "acessorioEquipado"
         case nivelLegado = "nivel"
     }
@@ -183,6 +192,7 @@ struct Personagem: Codable {
         runicasConquistadas = try c.decodeIfPresent(Set<String>.self, forKey: .runicasConquistadas) ?? []
         runicaSelecionada = try c.decodeIfPresent(String.self, forKey: .runicaSelecionada) ?? nil
         runicaEquipadaAtiva = try c.decodeIfPresent(String.self, forKey: .runicaEquipadaAtiva) ?? nil
+        sequenciaDeExploracao = try c.decodeIfPresent(Int.self, forKey: .sequenciaDeExploracao) ?? 0
     }
 
     // Escrito à mão porque o `CodingKeys` tem chaves extras
@@ -221,6 +231,7 @@ struct Personagem: Codable {
         try c.encode(runicasConquistadas, forKey: .runicasConquistadas)
         try c.encode(runicaSelecionada, forKey: .runicaSelecionada)
         try c.encode(runicaEquipadaAtiva, forKey: .runicaEquipadaAtiva)
+        try c.encode(sequenciaDeExploracao, forKey: .sequenciaDeExploracao)
     }
 
     var estaVivo: Bool {
@@ -475,7 +486,9 @@ struct Personagem: Codable {
 
     // Descansar é o "Site of Grace" do SoulGrid: recupera vida/energia,
     // recarrega as cargas do Frasco Sagrado e ativa a Grande Rúnica
-    // selecionada (se for diferente da que já estava ativa).
+    // selecionada (se for diferente da que já estava ativa). Também zera a
+    // sequência de exploração — descansar é a opção seguindo, então abre
+    // mão do bônus acumulado em troca de recomeçar do zero sem risco.
     mutating func descansar() {
         if runicaSelecionada != runicaEquipadaAtiva {
             runicaEquipadaAtiva = runicaSelecionada
@@ -485,6 +498,14 @@ struct Personagem: Codable {
         energiaAtual = energiaMaximaTotal
         frascosDeVidaAtuais = frascosDeVidaAlocados
         frascosDeEnergiaAtuais = frascosDeEnergiaAlocados
+        sequenciaDeExploracao = 0
+    }
+
+    // +4% de Runas por ponto de sequência de exploração, até +40% no topo
+    // (sequência 10) — não escala pra sempre, senão a sequência dominaria
+    // completamente a economia do jogo.
+    var bonusDeSequenciaPercentual: Int {
+        min(40, sequenciaDeExploracao * 4)
     }
 
     // MARK: - Frasco Sagrado
@@ -592,10 +613,12 @@ struct Personagem: Codable {
     // zona (`novaRunica`, nil se já tinha sido conquistada antes).
     mutating func receberRecompensa(deInimigo inimigo: Inimigo) -> (runas: Int, item: Item?, novaRunica: String?) {
         var runasGanhas = inimigo.xpRecompensa + Int.random(in: inimigo.ouroRecompensa)
-        if bonusOuroPercentualTotal > 0 {
-            runasGanhas += runasGanhas * bonusOuroPercentualTotal / 100
+        let bonusPercentual = bonusOuroPercentualTotal + bonusDeSequenciaPercentual
+        if bonusPercentual > 0 {
+            runasGanhas += runasGanhas * bonusPercentual / 100
         }
         ouro += runasGanhas
+        sequenciaDeExploracao += 1
 
         var itemGanho: Item? = nil
         let chanceDeLoot = min(100, (inimigo.chefe ? 100 : (inimigo.elite ? 70 : 35)) + bonusChanceDeItemTotal)
@@ -620,10 +643,12 @@ struct Personagem: Codable {
     // de Elden Ring. Recompensa menor que vencer um inimigo, mas de graça.
     mutating func receberDescoberta(nivelZona: Int) -> (runas: Int, item: Item?) {
         var runasGanhas = Int.random(in: (4 + nivelZona)...(9 + nivelZona * 2))
-        if bonusOuroPercentualTotal > 0 {
-            runasGanhas += runasGanhas * bonusOuroPercentualTotal / 100
+        let bonusPercentual = bonusOuroPercentualTotal + bonusDeSequenciaPercentual
+        if bonusPercentual > 0 {
+            runasGanhas += runasGanhas * bonusPercentual / 100
         }
         ouro += runasGanhas
+        sequenciaDeExploracao += 1
 
         var itemGanho: Item? = nil
         let chanceDeItem = min(100, 40 + bonusChanceDeItemTotal)

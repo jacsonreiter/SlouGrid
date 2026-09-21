@@ -20,6 +20,11 @@ struct TelaDeCombate: View {
     @State private var veneno: (dano: Int, turnos: Int)? = nil
     @State private var inimigoAtordoado = false
 
+    // Golpe carregado do chefe (estilo "telegraph" de RPG por turnos, ver
+    // `aplicarAtaqueDoChefe`) — só chefes fazem isso, inimigo comum nunca.
+    @State private var turnosAteGolpeDoChefe = 3
+    @State private var chefePrestesAGolpear = false
+
     // Fortalecimentos ativos no herói (só duram durante este combate,
     // nunca alteram os atributos salvos do personagem).
     @State private var bonusForcaTemporario = 0
@@ -91,6 +96,12 @@ struct TelaDeCombate: View {
                         Label("Atordoado", systemImage: "zzz")
                             .font(.caption2)
                             .foregroundColor(.yellow)
+                    }
+                    if chefePrestesAGolpear {
+                        Label("Carregando golpe!", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
                     }
                 }
             }
@@ -625,16 +636,56 @@ struct TelaDeCombate: View {
             return
         }
 
-        let resultado = vm.heroi.sofrerDano(deInimigo: inimigo.forca, bonusDefesa: bonusDefesaTemporaria)
-        if resultado.esquivou {
-            log.append("Você esquivou do ataque de \(inimigo.nome)!")
+        if inimigo.chefe {
+            aplicarAtaqueDoChefe()
         } else {
-            log.append("\(inimigo.nome) atacou você causando \(resultado.dano) de dano.")
+            let resultado = vm.heroi.sofrerDano(deInimigo: inimigo.forca, bonusDefesa: bonusDefesaTemporaria)
+            if resultado.esquivou {
+                log.append("Você esquivou do ataque de \(inimigo.nome)!")
+            } else {
+                log.append("\(inimigo.nome) atacou você causando \(resultado.dano) de dano.")
+            }
         }
         vm.heroi.regenerarEnergia(5 + vm.heroi.regenEnergiaPorTurno)
 
         if !vm.heroi.estaVivo {
             finalizarCombate(vitoria: false)
+        }
+    }
+
+    // O que diferencia um chefe de um inimigo comum, além dos números: a
+    // cada poucos turnos, em vez de atacar, ele avisa que está carregando um
+    // golpe pesado — o jogador ganha o turno seguinte pra reagir (curar,
+    // fortalecer a defesa, beber o Frasco) antes do golpe vir com força
+    // total. Estilo o "telegraph" clássico de RPG por turnos: dá pra
+    // aprender o padrão e se preparar, não é um dano surpresa injusto.
+    private func aplicarAtaqueDoChefe() {
+        if chefePrestesAGolpear {
+            let forcaDoGolpe = Int(Double(inimigo.forca) * 2.2)
+            let resultado = vm.heroi.sofrerDano(deInimigo: forcaDoGolpe, bonusDefesa: bonusDefesaTemporaria)
+            if resultado.esquivou {
+                log.append("Você esquivou do golpe carregado de \(inimigo.nome)!")
+            } else {
+                log.append("O golpe carregado de \(inimigo.nome) atinge em cheio, causando \(resultado.dano) de dano!")
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            chefePrestesAGolpear = false
+            turnosAteGolpeDoChefe = 3
+            return
+        }
+
+        turnosAteGolpeDoChefe -= 1
+        if turnosAteGolpeDoChefe <= 0 {
+            chefePrestesAGolpear = true
+            log.append("\(inimigo.nome) começa a carregar um golpe devastador! Prepare-se para o próximo turno.")
+            return
+        }
+
+        let resultado = vm.heroi.sofrerDano(deInimigo: inimigo.forca, bonusDefesa: bonusDefesaTemporaria)
+        if resultado.esquivou {
+            log.append("Você esquivou do ataque de \(inimigo.nome)!")
+        } else {
+            log.append("\(inimigo.nome) atacou você causando \(resultado.dano) de dano.")
         }
     }
 
@@ -664,6 +715,10 @@ struct TelaDeCombate: View {
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } else {
+            // Derrota zera a sequência de exploração (ver
+            // `Personagem.descansar`/`bonusDeSequenciaPercentual`) — o risco
+            // real de continuar empurrando a sorte em vez de descansar.
+            vm.heroi.sequenciaDeExploracao = 0
             log.append("Você foi derrotado! Volte para descansar.")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }

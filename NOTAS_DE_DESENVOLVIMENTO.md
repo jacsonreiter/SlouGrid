@@ -546,6 +546,47 @@ as classes.
   parênteses/colchetes/chaves balanceados via script — sem Xcode/simulador
   neste ambiente. **Ainda não jogado** com essa versão.
 
+## Masmorras mais desafiadoras: golpe telegrafado de chefe + sequência de risco/recompensa (sessão seguinte)
+
+Pedido do usuário: melhorar as masmorras pra desafiar de verdade e dar
+vontade de continuar jogando/evoluindo. Pesquisei (via busca na web)
+princípios de design de roguelike e Souls-like antes de implementar —
+resumo do que voltou e como virou código:
+
+- **Telegraphing de boss é o padrão-ouro de dificuldade justa** (fontes:
+  gamedesignskills.com, game-wisdom.com, itch.io sobre boss design) —
+  ataques fortes devem ser avisados com antecedência, o jogador aprende o
+  padrão e reage, em vez de tomar dano "surpresa" que parece injusto.
+  Implementado como `TelaDeCombate.aplicarAtaqueDoChefe()`: só chefes (não
+  inimigos comuns) intercalam ataques normais com um golpe carregado — a
+  cada 3 turnos, em vez de atacar, o chefe avisa ("começa a carregar um
+  golpe devastador!") e o jogador ganha o turno seguinte pra reagir (curar,
+  fortalecer a Defesa, beber o Frasco); no turno depois, o golpe vem com
+  ×2.2 de força. Indicador visual "Carregando golpe!" no card do inimigo
+  além da mensagem no log. Chefes agora são mecanicamente diferentes de
+  inimigos comuns, não só "mais HP e força".
+- **Push-your-luck é o padrão de risco/recompensa de roguelike** (fontes:
+  Medium sobre RNG justo em roguelikes, exemplos como Greedy Warlock/Space
+  Dungeon) — decidir entre continuar arriscando por recompensa maior ou
+  recuar com segurança é o que dá peso a continuar jogando. Implementado
+  como `Personagem.sequenciaDeExploracao` (novo campo persistido): cada
+  vitória ou Descoberta sem descansar soma 1 e dá +4% de Runas (até +40%
+  no topo, sequência 10); `descansar()` ou ser derrotado zera tudo. Mostra
+  em `TelaDeMasmorras` (nova `sequenciaBox`, only quando > 0) e no
+  `statusBox` de `TelaDoPersonagem` — o jogador sempre vê o que tem a
+  perder antes de decidir "mais uma masmorra" ou "melhor descansar".
+- Nenhum arquivo novo, nenhuma mudança em `project.pbxproj`. Validado só
+  lendo o código (incluindo checagem de parênteses/colchetes/chaves
+  balanceados) — sem Xcode/simulador neste ambiente. **Ainda não jogado**
+  com essa versão — o multiplicador ×2.2 do golpe carregado e o +4%/ponto
+  da sequência são estimativas, não calibradas jogando de verdade.
+- Ideias de design pesquisadas mas não implementadas ainda, se quiser
+  continuar nessa linha: mecânica de fases por % de vida específica por
+  chefe (não só o golpe carregado genérico), telegraphs com sabor único
+  por chefe em vez do texto genérico atual, e um "pity" de loot (item
+  garantido depois de N explorações sem nada cair, técnica citada nas
+  fontes pesquisadas pra evitar frustração de RNG ruim).
+
 ## Ainda não feito / ideias em aberto
 
 - **Nenhum playtest real** dos números foi feito — tudo é estimativa

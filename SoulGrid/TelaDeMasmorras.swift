@@ -22,6 +22,10 @@ struct TelaDeMasmorras: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
+                if vm.heroi.sequenciaDeExploracao > 0 {
+                    sequenciaBox
+                }
+
                 if !vm.heroi.estaVivo {
                     VStack(spacing: 12) {
                         Image(systemName: "bed.double.fill")
@@ -59,6 +63,25 @@ struct TelaDeMasmorras: View {
         } message: {
             Text(mensagemDeDescoberta ?? "")
         }
+    }
+
+    // Mostra a sequência de exploração e o bônus de Runas que ela já dá —
+    // lembra o jogador da decisão em aberto: continuar empurrando a sorte
+    // por mais recompensa, ou voltar pra "Descansar" e zerar com segurança.
+    var sequenciaBox: some View {
+        HStack {
+            Label("Sequência de Exploração: \(vm.heroi.sequenciaDeExploracao)", systemImage: "flame.fill")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Spacer()
+            Text("+\(vm.heroi.bonusDeSequenciaPercentual)% Runas")
+                .font(.subheadline)
+                .fontWeight(.bold)
+        }
+        .foregroundColor(.orange)
+        .padding(10)
+        .background(Color.orange.opacity(0.12))
+        .cornerRadius(10)
     }
 
     // Como no mapa aberto de Elden Ring: a maior parte das explorações leva
