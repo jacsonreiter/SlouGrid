@@ -1053,44 +1053,61 @@ struct Personagem: Codable {
         (Item.pedraDeForja(paraRaridade: item.raridade), item.nivelDeEvolucao + 1, 80 + item.nivelDeEvolucao * 60)
     }
 
-    // Evolui a peça equipada no slot indicado (arma ou armadura), consumindo
-    // Pedras de Forja da tier da raridade dela + Runas. O bônus efetivo já
-    // reflete o novo nível imediatamente (ver `Item.bonusEvoluido`), sem
-    // precisar reequipar. Só a peça EQUIPADA evolui — nunca uma cópia parada
-    // na mochila — pra não ambiguar qual unidade de uma pilha está sendo
+    // Evolui a peça equipada (arma OU armadura), consumindo Pedras de Forja
+    // da tier da raridade dela + Runas. O bônus efetivo já reflete o novo
+    // nível imediatamente (ver `Item.bonusEvoluido`), sem precisar
+    // reequipar. Só a peça EQUIPADA evolui — nunca uma cópia parada na
+    // mochila — pra não ambiguar qual unidade de uma pilha está sendo
     // reforçada.
-    private mutating func evoluir(_ slot: inout Item?, nomeParaFalta: String) -> String {
-        guard var item = slot else { return nomeParaFalta }
-        guard item.tipo == .arma || item.tipo == .armadura else {
-            return "Só armas e armaduras podem ser evoluídas na Forja."
+    //
+    // `evoluirArmaEquipada`/`evoluirArmaduraEquipada` abaixo repetem essa
+    // lógica em vez de compartilhar um helper com `inout Item?` — Swift não
+    // permite `self.evoluir(&self.armaEquipada, …)` (outro método
+    // `mutating` do mesmo `self` recebendo um `inout` pra uma propriedade
+    // desse mesmo `self`): "overlapping accesses to self", erro de
+    // exclusividade só descoberto em tempo de compilação de verdade.
+    mutating func evoluirArmaEquipada() -> String {
+        guard var item = armaEquipada else {
+            return "Você precisa equipar uma arma antes de evoluí-la na Forja."
         }
         guard item.nivelDeEvolucao < Item.nivelMaximoDeEvolucao else {
             return "\(item.nome) já está no nível máximo de evolução (+\(Item.nivelMaximoDeEvolucao))."
         }
-
         let (pedra, quantidadePedra, custoRunas) = custoParaEvoluir(item)
-
         guard quantidadeDoItem(nome: pedra.nome) >= quantidadePedra else {
             return "Faltam \(pedra.nome) para evoluir \(item.nome) (\(quantidadeDoItem(nome: pedra.nome))/\(quantidadePedra))."
         }
         guard ouro >= custoRunas else {
             return "Runas insuficientes! A Forja cobra \(custoRunas) Runas para esse reforço."
         }
-
         removerQuantidade(doItemNomeado: pedra.nome, quantidade: quantidadePedra)
         ouro -= custoRunas
         item.nivelDeEvolucao += 1
-        slot = item
+        armaEquipada = item
         recalcularMaximos()
         return "\(item.nome) evoluiu para +\(item.nivelDeEvolucao)! Novo bônus: \(item.bonusEvoluido.descricaoCurta)."
     }
 
-    mutating func evoluirArmaEquipada() -> String {
-        evoluir(&armaEquipada, nomeParaFalta: "Você precisa equipar uma arma antes de evoluí-la na Forja.")
-    }
-
     mutating func evoluirArmaduraEquipada() -> String {
-        evoluir(&armaduraEquipada, nomeParaFalta: "Você precisa equipar uma armadura antes de evoluí-la na Forja.")
+        guard var item = armaduraEquipada else {
+            return "Você precisa equipar uma armadura antes de evoluí-la na Forja."
+        }
+        guard item.nivelDeEvolucao < Item.nivelMaximoDeEvolucao else {
+            return "\(item.nome) já está no nível máximo de evolução (+\(Item.nivelMaximoDeEvolucao))."
+        }
+        let (pedra, quantidadePedra, custoRunas) = custoParaEvoluir(item)
+        guard quantidadeDoItem(nome: pedra.nome) >= quantidadePedra else {
+            return "Faltam \(pedra.nome) para evoluir \(item.nome) (\(quantidadeDoItem(nome: pedra.nome))/\(quantidadePedra))."
+        }
+        guard ouro >= custoRunas else {
+            return "Runas insuficientes! A Forja cobra \(custoRunas) Runas para esse reforço."
+        }
+        removerQuantidade(doItemNomeado: pedra.nome, quantidade: quantidadePedra)
+        ouro -= custoRunas
+        item.nivelDeEvolucao += 1
+        armaduraEquipada = item
+        recalcularMaximos()
+        return "\(item.nome) evoluiu para +\(item.nivelDeEvolucao)! Novo bônus: \(item.bonusEvoluido.descricaoCurta)."
     }
 
     // Desequipa o talismã de um slot específico e devolve ele para a mochila.
