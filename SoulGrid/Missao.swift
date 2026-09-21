@@ -116,7 +116,7 @@ extension Missao {
                pnjID: "toren"),
 
         // Nível 16, com recompensa exclusiva por classe — só a que combina
-        // com o herói atual aparece na Vila (ver `TelaDaVila.missoesDoPNJ`).
+        // com o herói atual aparece na Vila (ver `TelaDaVila.missoesVisiveis`).
         Missao(id: "marco_nivel_16_guerreiro", titulo: "O Peso da Lenda",
                descricao: "Alcance o nível 16.",
                tipo: .alcancarNivel, quantidadeAlvo: 16, nivelMinimo: 1,
