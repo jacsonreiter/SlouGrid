@@ -651,6 +651,41 @@ dentro da mesma visita, não voltar pro menu.
   teto de escala (+6 níveis) são estimativas informadas pela pesquisa, não
   calibradas jogando de verdade.
 
+## Ícone recentrado + logo dentro do app (sessão seguinte)
+
+Pedido do usuário: o ícone do app estava torto/cortado, precisava
+centralizar; e queria a logo (`IMG_6153.JPG`, enviada direto pro
+repositório via upload no GitHub, peguei com `git merge origin/main`)
+aparecendo dentro do app também, nas telas principais.
+
+- **Ícone recentralizado**: o corte antigo (`AppIcon-1024.png`) cortava a
+  espada/hexágono de forma assimétrica, o que dava a sensação de "torto".
+  Usei Python (Pillow, instalado neste ambiente) pra achar
+  automaticamente a caixa delimitadora do emblema (excluindo o texto
+  "Soul Grid RPG" abaixo, que a Apple recomenda não ter no ícone) via
+  detecção de pixels não-pretos, e gerei um recorte quadrado centralizado
+  nele, com margem uniforme dos lados e o mínimo de margem embaixo (pra
+  não reincluir o texto, que fica bem colado no emblema na imagem
+  original). Resultado: emblema inteiro visível, sem corte, sem texto,
+  bem centralizado.
+- **Logo dentro do app**: criado um novo imageset `Assets.xcassets/
+  Logo.imageset` (pasta nova dentro do catálogo de assets já existente —
+  não precisou mexer no `project.pbxproj`, que referencia `Assets.xcassets`
+  como uma pasta só, não arquivo por arquivo) com um recorte mais generoso
+  da imagem original (emblema + texto "Soul Grid RPG", a versão completa),
+  cortado só pra tirar o excesso de fundo preto ao redor. Usado em duas
+  telas "de entrada": `TelaDeCadastro` (primeira tela que aparece, troquei
+  o ícone genérico do SF Symbols pela logo de verdade — e removi o texto
+  "Bem-vindo(a) ao Soul Grid" que ficou redundante, já que a logo já diz
+  isso) e `TelaDeHerois` (tela principal ao reabrir o app depois do
+  cadastro, logo menor no topo).
+- `IMG_6153.JPG` ficou na raiz do repositório (não faz parte do projeto
+  Xcode, não é referenciada em lugar nenhum do build) — só o arquivo-fonte
+  pra referência futura, igual já era antes com o ícone.
+- Validado só lendo o código com cuidado (parênteses/colchetes/chaves
+  balanceados via script) e inspecionando as imagens geradas visualmente
+  — sem Xcode/simulador neste ambiente.
+
 ## Ainda não feito / ideias em aberto
 
 - **Nenhum playtest real** dos números foi feito — tudo é estimativa
