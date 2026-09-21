@@ -265,6 +265,131 @@ O usuário jogou pouco depois de ler o resumo e pediu 2 ajustes finos:
   tinha Defesa investida no sistema anterior perde esse investimento (só
   relevante para heróis de teste criados durante esta sessão).
 
+## Deploy: GitHub + TestFlight (sessão separada, em aberto — RETOMAR DAQUI)
+
+Pedido do usuário: colocar o projeto no GitHub e conseguir enviar pro
+TestFlight/App Store. Isso é sobre infraestrutura de build/publicação, não
+sobre o jogo em si — mas ficou em aberto (bloqueado num erro de
+autenticação) e é a prioridade #1 da próxima sessão se o assunto for
+retomado.
+
+### O que já está pronto
+
+- **Repositório**: https://github.com/jacsonreiter/SlouGrid (público),
+  branch `main`. Git local configurado com autor "Jacson Reiter"
+  (jacson_reiter@hotmail.com), `.gitignore` cobrindo build/DerivedData/
+  xcuserdata/certificados.
+- **Ícone do app**: `SoulGrid/Assets.xcassets/AppIcon.appiconset/
+  AppIcon-1024.png` — recortado do emblema (espada+hexágono) de
+  `~/Desktop/IMG_6153.JPG`, 1024×1024, RGB sem alpha, sem o texto "Soul
+  Grid RPG" (Apple recomenda ícone sem o nome do app escrito nele).
+- **Bundle ID** `jr.SoulGrid`, `DEVELOPMENT_TEAM = VFPXSCUCXD` (Team do
+  usuário, capturado automaticamente quando ele configurou Signing &
+  Capabilities no Xcode local).
+- **Scheme compartilhado**: `SoulGrid.xcodeproj/xcshareddata/xcschemes/
+  SoulGrid.xcscheme` — precisou ser criado à mão (o projeto só tinha
+  scheme autocriado/local, que não vai pro git e não existe em CI). Sem
+  isso `xcodebuild -scheme SoulGrid` falha em qualquer máquina que não seja
+  a do usuário.
+
+### O obstáculo real: hardware do usuário não roda o Xcode exigido
+
+O Mac do usuário é um **MacBook Pro 13" de 2015 (MacBookPro12,1)**, preso
+no **macOS Monterey 12.7.6** (é o teto oficial da Apple pra esse modelo —
+não recebe Sequoia/Tahoe). Isso trava o Xcode local em no máximo **14.2**,
+cujo SDK mais novo é o **iOS 16.2**. Desde 28/abr/2026 a Apple exige builds
+com o **SDK do iOS 26 (Xcode 26+)** pra aceitar qualquer envio no App
+Store Connect, e o Xcode 26 exige **macOS Sequoia 15.6+** — que a Apple
+não libera pra esse hardware. **Não é config, é teto físico**: esse Mac
+não vai conseguir enviar pro App Store Connect via Xcode local, ponto.
+Codar/testar no simulador nesse Mac continua funcionando numa boa (SDK
+iOS 16.2 é suficiente pra isso), só o envio final que não rola.
+
+Opções discutidas com o usuário: GitHub Actions (escolhida), pedir
+emprestado um Mac mais novo, alugar Mac na nuvem (MacInCloud etc.), ou
+OpenCore Legacy Patcher (não oficial, arriscado). **Escolhida: GitHub
+Actions**, já que o repositório já estava no GitHub.
+
+### Solução em andamento: build + upload via GitHub Actions
+
+Arquivos criados (todos já commitados/pushed):
+- `.github/workflows/testflight.yml` — dispara só manualmente
+  (`workflow_dispatch`, aba Actions → Run workflow), roda em `macos-26`
+  (runner com Xcode 26 de verdade). Passos: checkout → importa
+  certificado+provisioning profile num keychain temporário (receita
+  oficial do GitHub) → importa a chave da App Store Connect API →
+  `xcodebuild archive` → `xcodebuild -exportArchive` (com
+  `destination: upload` no plist, exporta E envia pro App Store Connect
+  num passo só, sem precisar de Apple ID/senha) → limpa keychain/chave no
+  final.
+- `ExportOptions.plist` (raiz do repo) — `method: app-store-connect`,
+  `destination: upload`, `teamID: VFPXSCUCXD`, `signingStyle: automatic`.
+- 7 GitHub Secrets criados pelo usuário (nomes exatos, todos no repo
+  SlouGrid): `BUILD_CERTIFICATE_BASE64`, `P12_PASSWORD`,
+  `BUILD_PROVISION_PROFILE_BASE64`, `KEYCHAIN_PASSWORD`,
+  `APP_STORE_CONNECT_API_KEY_ID`, `APP_STORE_CONNECT_API_ISSUER_ID`,
+  `APP_STORE_CONNECT_API_KEY_BASE64`. **Importante**: o usuário tem outro
+  projeto/repo, "Finvy", na mesma conta Apple Developer — foram criadas
+  credenciais NOVAS e separadas pro SoulGrid (certificado adicional, API
+  Key adicional) em vez de reaproveitar/revogar as do Finvy, exatamente
+  pra não quebrar o Finvy. Segredos do GitHub são só-escrita (ninguém lê o
+  valor de volta, nem pela API), então nunca dá pra "copiar" de um repo pro
+  outro — só recriar.
+
+### Estado atual: travado num 401 de autenticação (não resolvido ainda)
+
+3 execuções do workflow, todas falhando no step **Archive**, sempre com o
+mesmo erro:
+```
+error: Communication with Apple failed: A non-HTTP 200 response was
+received (401) for URL .../listTeams.action?clientId=...
+error: No profiles for 'jr.SoulGrid' were found: ... iOS App Development
+provisioning profiles matching 'jr.SoulGrid'.
+```
+(runs: 35641020939, 35641547445, 35643077280 — todas no repo SlouGrid)
+
+O 401 é a causa raiz (autenticação da chave da API falhando); o "no
+profiles found" é consequência (sem autenticar, o Xcode não consegue
+negociar signing automático). Adicionei um step de diagnóstico
+("Sanity-check API key secrets", sem imprimir nenhum valor de secret) que
+já confirmou que **o formato dos 3 segredos da API Key está correto**:
+Key ID com 10 caracteres, Issuer ID com 36 (UUID), arquivo `.p8`
+decodificado com 257 bytes e cabeçalho/rodapé `BEGIN/END PRIVATE KEY`
+corretos. Ou seja, não é problema de copiar/colar quebrado — é a
+**chave em si** que a Apple está rejeitando.
+
+**Hipótese mais provável, ainda não testada**: o `APP_STORE_CONNECT_API_KEY_ID`
+e o `APP_STORE_CONNECT_API_KEY_BASE64` podem ser de **duas gerações de
+chave diferentes** (ex: copiou o ID de uma tentativa e o `.p8` de outra),
+ou a chave usada não está com status "Active" em App Store Connect →
+Users and Access → Integrations → App Store Connect API. Outras hipóteses
+menos prováveis: Issuer ID de contexto de Team errado (se o usuário tiver
+acesso a mais de um Team), ou delay de propagação de uma chave recém-criada
+(geralmente resolve em poucos minutos).
+
+**Próximo passo sugerido pro usuário** (ainda não confirmado se resolveu):
+gerar uma chave de API nova do zero, copiar o Key ID e baixar/converter o
+`.p8` NA MESMA sessão (sem misturar com arquivos de tentativas antigas),
+conferir que aparece "Active" na lista, atualizar os 2 secrets juntos, e
+rodar de novo.
+
+### Se retomar esse assunto numa próxima sessão
+
+1. Perguntar se o usuário já tentou de novo por conta própria, e se sim,
+   pedir o log do step "Archive" da run mais recente (dá pra listar runs
+   via `curl https://api.github.com/repos/jacsonreiter/SlouGrid/actions/runs`,
+   é repo público, funciona sem autenticação — só não dá pra baixar o log
+   bruto de um step sem permissão de admin no repo, por isso sempre foi
+   pedido pro usuário colar o texto manualmente).
+2. Se o 401 persistir mesmo com uma chave nova/confirmada "Active", pode
+   valer testar a chave isoladamente com uma chamada de API mais simples
+   (ex: `curl` gerando um JWT manualmente e chamando
+   `https://api.appstoreconnect.apple.com/v1/apps`) pra isolar se o
+   problema é mesmo a chave ou algo específico do fluxo do `xcodebuild`.
+3. Uma vez o Archive funcionar, o próximo passo (`Export and upload`) usa
+   as mesmas credenciais — se o Archive passar, é provável que o upload
+   também passe, mas ainda não foi testado nem uma vez com sucesso.
+
 ## Ainda não feito / ideias em aberto
 
 - **Nenhum playtest real** dos números foi feito — tudo é estimativa
