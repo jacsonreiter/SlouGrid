@@ -239,6 +239,9 @@ struct TelaDoPersonagem: View {
                 NavigationLink(destination: TelaDoMercado()) {
                     botao("Ir ao Mercado", cor: .purple, icone: "cart.fill")
                 }
+                NavigationLink(destination: TelaDaVila()) {
+                    botao("Ir à Vila", cor: .green, icone: "house.fill")
+                }
                 Button {
                     mensagem = descansarEDescrever()
                 } label: {

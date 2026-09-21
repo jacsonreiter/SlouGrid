@@ -79,6 +79,14 @@ struct Personagem: Codable {
     // continuar jogando em vez de parar a qualquer momento.
     var sequenciaDeExploracao: Int = 0
 
+    // Missões já entregues na Vila (ver `Missao`/`PNJ`/`TelaDaVila`) — só
+    // essa chave precisa ser salva. O progresso em si nunca é um contador
+    // novo: `statusDaMissao` reaproveita `progressoZonas` (caçada) e
+    // `runicasConquistadas` (chefe), que o herói já guardava por outro
+    // motivo, então uma missão nunca "perde" progresso feito antes dela
+    // existir ou antes do jogador visitar a Vila pela primeira vez.
+    var missoesEntregues: Set<String> = []
+
     static let numeroDeSlotsDeMagia = 3
     static let numeroDeSlotsDeAcessorio = 3
 
@@ -122,7 +130,7 @@ struct Personagem: Codable {
              cargasDeFrascoTotal, frascosDeVidaAlocados, frascosDeEnergiaAlocados,
              frascosDeVidaAtuais, frascosDeEnergiaAtuais, potenciaDoFrasco,
              runicasConquistadas, runicaSelecionada, runicaEquipadaAtiva,
-             sequenciaDeExploracao
+             sequenciaDeExploracao, missoesEntregues
         case acessorioEquipadoLegado = "acessorioEquipado"
         case nivelLegado = "nivel"
     }
@@ -193,6 +201,7 @@ struct Personagem: Codable {
         runicaSelecionada = try c.decodeIfPresent(String.self, forKey: .runicaSelecionada) ?? nil
         runicaEquipadaAtiva = try c.decodeIfPresent(String.self, forKey: .runicaEquipadaAtiva) ?? nil
         sequenciaDeExploracao = try c.decodeIfPresent(Int.self, forKey: .sequenciaDeExploracao) ?? 0
+        missoesEntregues = try c.decodeIfPresent(Set<String>.self, forKey: .missoesEntregues) ?? []
     }
 
     // Escrito à mão porque o `CodingKeys` tem chaves extras
@@ -232,6 +241,7 @@ struct Personagem: Codable {
         try c.encode(runicaSelecionada, forKey: .runicaSelecionada)
         try c.encode(runicaEquipadaAtiva, forKey: .runicaEquipadaAtiva)
         try c.encode(sequenciaDeExploracao, forKey: .sequenciaDeExploracao)
+        try c.encode(missoesEntregues, forKey: .missoesEntregues)
     }
 
     var estaVivo: Bool {
@@ -628,6 +638,65 @@ struct Personagem: Codable {
 
     func vitoriasNaZona(_ nome: String) -> Int {
         progressoZonas[nome] ?? 0
+    }
+
+    // MARK: - Missões (Vila)
+
+    // O que mostrar na Vila para cada missão: bloqueada (nível baixo
+    // demais), em andamento (com o progresso atual/alvo), pronta pra
+    // entregar, ou já entregue. Calculado sob demanda a partir de dados
+    // que o herói já guarda por outro motivo (ver comentário em
+    // `missoesEntregues`), nunca armazenado.
+    enum StatusDeMissao: Equatable {
+        case bloqueada
+        case emAndamento(atual: Int, alvo: Int)
+        case prontaParaEntrega
+        case entregue
+    }
+
+    func statusDaMissao(_ missao: Missao) -> StatusDeMissao {
+        if missoesEntregues.contains(missao.id) { return .entregue }
+        guard nivel >= missao.nivelMinimo else { return .bloqueada }
+
+        switch missao.tipo {
+        case .cacar:
+            let atual = missao.zonaAlvo.map { vitoriasNaZona($0) } ?? 0
+            return atual >= missao.quantidadeAlvo
+                ? .prontaParaEntrega
+                : .emAndamento(atual: atual, alvo: missao.quantidadeAlvo)
+        case .derrotarChefe:
+            guard let zona = missao.zonaAlvo else { return .bloqueada }
+            return runicasConquistadas.contains(zona)
+                ? .prontaParaEntrega
+                : .emAndamento(atual: 0, alvo: 1)
+        case .alcancarNivel:
+            return nivel >= missao.quantidadeAlvo
+                ? .prontaParaEntrega
+                : .emAndamento(atual: nivel, alvo: missao.quantidadeAlvo)
+        }
+    }
+
+    // Entrega uma missão pronta e concede a recompensa — Runas (com os
+    // mesmos bônus percentuais de talismã/sequência das outras fontes de
+    // Runas) e, se houver, um item exclusivo que não existe no mercado.
+    mutating func entregarMissao(_ missao: Missao) -> String {
+        guard statusDaMissao(missao) == .prontaParaEntrega else {
+            return "Essa missão ainda não pode ser entregue."
+        }
+        missoesEntregues.insert(missao.id)
+
+        var runasGanhas = missao.recompensaRunas
+        if bonusOuroPercentualTotal > 0 {
+            runasGanhas += runasGanhas * bonusOuroPercentualTotal / 100
+        }
+        ouro += runasGanhas
+
+        var texto = "Missão concluída! +\(runasGanhas) Runas."
+        if let item = missao.recompensaItem {
+            adicionarItem(item)
+            texto += " Recompensa: \(item.nome)!"
+        }
+        return texto
     }
 
     // Aplica Runas e (às vezes) um item de loot pela derrota de um inimigo.

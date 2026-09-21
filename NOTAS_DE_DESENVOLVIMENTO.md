@@ -789,3 +789,59 @@ descartado por tamanho): elite com escolta de inimigos comuns junto
 (field boss guardado), pool de inimigos élite variado por zona. Validado
 só por leitura cuidadosa + balanceamento de parênteses/chaves via script —
 **sem playtest real de novo**, é a mesma ressalva já registrada acima.
+
+## Vila: NPCs e missões (mesma sessão)
+
+Pedido do usuário junto com o rebalanceamento acima: mais motivo pra
+evoluir e explorar além das masmorras — perguntou explicitamente se dava
+pra ter uma vila/cidade com NPCs oferecendo missões, estilo os NPCs de
+bounty/pedido espalhados por Roundtable Hold em Elden Ring (Irina, White
+Mask Varré, D...).
+
+Arquivos novos: `Missao.swift`, `PNJ.swift`, `TelaDaVila.swift` (com as
+4 entradas de `project.pbxproj` cada — PBXBuildFile, PBXFileReference,
+grupo e Sources, seguindo o padrão dos arquivos existentes, já que este
+projeto usa referências explícitas em vez do modelo de pasta sincronizada
+do Xcode moderno).
+
+- **`Missao`**: struct simples (não Codable — é só catálogo estático) com
+  `id` string estável, tipo (`cacar`/`derrotarChefe`/`alcancarNivel`),
+  zona-alvo, quantidade-alvo, recompensa em Runas e opcionalmente um item
+  exclusivo. O truque de design: **nenhum progresso novo é rastreado**.
+  Caçada reaproveita `Personagem.progressoZonas` (já contava vitórias por
+  zona pra outra coisa), chefe reaproveita `runicasConquistadas` (só é
+  concedida na primeira derrota do chefe daquela zona), nível reaproveita
+  o `nivel` computed que já existe. O único campo novo persistido no
+  herói é `missoesEntregues: Set<String>` — quais já foram resgatadas.
+  Isso significa que progresso feito ANTES de visitar a Vila pela
+  primeira vez já conta (o jogador não perde nada por não saber que a
+  Vila existia).
+- **16 missões de zona** (caçar N + derrotar o chefe, uma dupla por cada
+  uma das 8 zonas) mais **2 marcos de progressão** oferecidos pelo Ancião
+  da Vila: nível 5 (acessório universal, "Broche do Aventureiro") e nível
+  16 (arma épica exclusiva por classe — "Fúria do Ancião" pro Guerreiro,
+  "Cajado do Vazio Sussurrante" pro Mago, "Garras da Vila Esquecida" pro
+  Ladino). Essas 3 armas nunca aparecem no mercado (não estão em
+  `Item.catalogoMercado`) — só existem entregando a missão, o "conquistar
+  armas fazendo quest" que foi pedido.
+- **`PNJ`**: 5 moradores (Milo/Yara/Bruno/Seraphine, um por faixa de duas
+  zonas, mais o Ancião Toren pros marcos), cada um só com nome, ícone e
+  uma fala de ambientação — sem diálogo ramificado, escopo deliberadamente
+  simples pra não virar um sistema de diálogo inteiro.
+- **`TelaDaVila`**: lista os PNJs e, pra cada um, as missões dele com um
+  selo de status (Bloqueada/X de Y/Concluída!/Entregue) e botão
+  "Entregar" quando pronta. Filtra as 3 variantes de missão de nível 16
+  pra só mostrar a que combina com a classe do herói atual (senão apareceria
+  3 vezes a "mesma" missão lado a lado). Navegação: novo botão "Ir à
+  Vila" em `TelaDoPersonagem`, ao lado de Masmorras/Mercado.
+- **`Personagem.statusDaMissao(_:)`** calcula o status sob demanda (não
+  armazenado) e **`entregarMissao(_:)`** paga a recompensa (com o mesmo
+  bônus percentual de Runas de talismã que as outras fontes já usam) e
+  marca como entregue — tudo ou nada, protegido por um `guard` igual ao
+  de `confirmarEvolucao`.
+
+Ainda não implementado: nenhuma missão de "coletar item" ou "escoltar" —
+só caça/chefe/nível, que cobrem a maior parte do valor com o menor
+código novo. Sem diálogo de NPC além da fala única. Válido considerar no
+futuro: uma missão recorrente/repetível pra dar o que fazer depois de
+zerar o catálogo fixo.
