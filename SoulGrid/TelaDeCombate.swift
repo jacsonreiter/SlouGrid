@@ -11,6 +11,10 @@ struct TelaDeCombate: View {
     // Guardado (não só usado no init) porque "Continuar Explorando" gera
     // um novo inimigo sem sair da tela — precisa do nível de novo.
     let nivelHeroi: Int
+    // Idem: "Continuar Explorando" precisa regerar inimigos com o mesmo
+    // multiplicador de New Game+ do resto do combate (ver `Zona.
+    // multiplicadorDeCiclo`).
+    let cicloNewGamePlus: Int
 
     // Sempre um array, mesmo contra chefe/elite (grupo de 1) — um único
     // caminho de código pra combate solo ou em grupo, em vez de duplicar
@@ -51,14 +55,15 @@ struct TelaDeCombate: View {
     @State private var bonusAgilidadeTemporaria = 0
     @State private var turnosDeBonusAgilidade = 0
 
-    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int, elite: Bool = false) {
+    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int, elite: Bool = false, cicloNewGamePlus: Int = 0) {
         self.zona = zona
         self.contraChefe = contraChefe
         self.elite = elite
         self.nivelHeroi = nivelHeroi
+        self.cicloNewGamePlus = cicloNewGamePlus
         _inimigos = State(initialValue: contraChefe
-            ? [zona.gerarChefe(nivelHeroi: nivelHeroi)]
-            : (elite ? [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi)] : zona.gerarGrupoComum(nivelHeroi: nivelHeroi)))
+            ? [zona.gerarChefe(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)]
+            : (elite ? [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)] : zona.gerarGrupoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)))
     }
 
     var body: some View {
@@ -521,10 +526,10 @@ struct TelaDeCombate: View {
     private func continuarExplorando() {
         switch zona.sortearEncontro() {
         case .comum:
-            inimigos = zona.gerarGrupoComum(nivelHeroi: nivelHeroi)
+            inimigos = zona.gerarGrupoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
             iniciarNovoEncontro()
         case .eliteDeCampo:
-            inimigos = [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi)]
+            inimigos = [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)]
             iniciarNovoEncontro()
         case .descoberta:
             let recompensa = vm.heroi.receberDescoberta(zonaNome: zona.nome, nivelZona: zona.nivelBaseInimigos)

@@ -87,6 +87,17 @@ struct Personagem: Codable {
     // existir ou antes do jogador visitar a Vila pela primeira vez.
     var missoesEntregues: Set<String> = []
 
+    // New Game+ (estilo Elden Ring): em vez de expandir o mundo pra sempre
+    // com mais níveis/zonas/vilas, depois de completar a trama principal
+    // ("O Selo Final", nível 40) o jogador pode iniciar um novo ciclo —
+    // o personagem, equipamento, Runas e progresso continuam exatamente
+    // como estavam, só o mundo (força/vida/defesa/recompensa de todo
+    // inimigo, ver `Zona.multiplicadorDeCiclo`) fica mais difícil e mais
+    // generoso. Escolhido no lugar de criar mundos 2/3/4 porque escala
+    // indefinidamente sem precisar de conteúdo novo pra cada faixa de
+    // nível, e é fiel ao próprio jogo em que o projeto se inspira.
+    var cicloNewGamePlus: Int = 0
+
     static let numeroDeSlotsDeMagia = 3
     static let numeroDeSlotsDeAcessorio = 3
 
@@ -130,7 +141,7 @@ struct Personagem: Codable {
              cargasDeFrascoTotal, frascosDeVidaAlocados, frascosDeEnergiaAlocados,
              frascosDeVidaAtuais, frascosDeEnergiaAtuais, potenciaDoFrasco,
              runicasConquistadas, runicaSelecionada, runicaEquipadaAtiva,
-             sequenciaDeExploracao, missoesEntregues
+             sequenciaDeExploracao, missoesEntregues, cicloNewGamePlus
         case acessorioEquipadoLegado = "acessorioEquipado"
         case nivelLegado = "nivel"
     }
@@ -202,6 +213,7 @@ struct Personagem: Codable {
         runicaEquipadaAtiva = try c.decodeIfPresent(String.self, forKey: .runicaEquipadaAtiva) ?? nil
         sequenciaDeExploracao = try c.decodeIfPresent(Int.self, forKey: .sequenciaDeExploracao) ?? 0
         missoesEntregues = try c.decodeIfPresent(Set<String>.self, forKey: .missoesEntregues) ?? []
+        cicloNewGamePlus = try c.decodeIfPresent(Int.self, forKey: .cicloNewGamePlus) ?? 0
     }
 
     // Escrito à mão porque o `CodingKeys` tem chaves extras
@@ -242,6 +254,7 @@ struct Personagem: Codable {
         try c.encode(runicaEquipadaAtiva, forKey: .runicaEquipadaAtiva)
         try c.encode(sequenciaDeExploracao, forKey: .sequenciaDeExploracao)
         try c.encode(missoesEntregues, forKey: .missoesEntregues)
+        try c.encode(cicloNewGamePlus, forKey: .cicloNewGamePlus)
     }
 
     var estaVivo: Bool {
@@ -731,6 +744,43 @@ struct Personagem: Codable {
             texto += "\n\n\(lore)"
         }
         return texto
+    }
+
+    // MARK: - New Game+
+
+    // Disponível depois de fechar a trama principal (ver comentário em
+    // `cicloNewGamePlus`). Fica disponível pra sempre depois disso — não
+    // exige derrotar o Devorador de Mundos de novo a cada ciclo (como o
+    // NG+ de verdade de Elden Ring exige), simplificado de propósito pra
+    // não travar o jogador atrás de uma re-jogada inteira só pra avançar
+    // de ciclo.
+    var elegivelParaNewGamePlus: Bool {
+        missoesEntregues.contains("marco_nivel_40")
+    }
+
+    // Inicia um novo ciclo: personagem, equipamento, Runas, missões e
+    // progresso continuam exatamente como estavam — só o multiplicador
+    // de dificuldade/recompensa do mundo (`Zona.multiplicadorDeCiclo`)
+    // sobe. Nada é resetado nem perdido, de propósito: não é um "recomeço
+    // de verdade", é o mundo ficando mais perigoso ao redor do mesmo herói.
+    mutating func iniciarNovoCicloNewGamePlus() -> String {
+        guard elegivelParaNewGamePlus else {
+            return "Você ainda precisa completar 'O Selo Final' (nível 40) antes de iniciar um novo ciclo."
+        }
+        cicloNewGamePlus += 1
+        return Personagem.textoDoNovoCiclo(cicloNewGamePlus)
+    }
+
+    private static func textoDoNovoCiclo(_ ciclo: Int) -> String {
+        let aviso = "Ciclo \(ciclo) iniciado: todas as criaturas do mundo ficam mais fortes — e mais generosas em Runas."
+        switch ciclo {
+        case 1:
+            return "Ancião Toren olha para o horizonte, sério. \"Eu temia isso. O Vazio nunca é destruído — apenas contido, e por pouco tempo. Um eco dele já se move lá fora, mais faminto que o Devorador que você derrotou. O mundo precisa de você mais uma vez.\"\n\n\(aviso)"
+        case 2:
+            return "Toren balança a cabeça, cansado. \"Dessa vez o eco voltou mais rápido que da última. Alguma coisa aprendeu com a própria derrota.\"\n\n\(aviso)"
+        default:
+            return "Toren já nem parece surpreso mais. \"Outro eco, outro ciclo. Você já não é o mesmo aventureiro que chegou aqui — e ainda bem, porque o Vazio também não é mais o mesmo.\"\n\n\(aviso)"
+        }
     }
 
     // Aplica Runas e (às vezes) um item de loot pela derrota de um inimigo.

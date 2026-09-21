@@ -21,6 +21,10 @@ struct TelaDaVila: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
 
+                if vm.heroi.elegivelParaNewGamePlus {
+                    novoCicloBox
+                }
+
                 ForEach(pnjsVisiveis) { pnj in
                     pnjBox(pnj)
                 }
@@ -55,6 +59,44 @@ struct TelaDaVila: View {
             guard let restrita = missao.recompensaItem?.classeRestrita else { return true }
             return restrita == vm.heroi.classe
         }
+    }
+
+    // New Game+ (ver `Personagem.cicloNewGamePlus`): só aparece depois de
+    // completar "O Selo Final" (nível 40). Iniciar um ciclo não reseta nem
+    // apaga nada do herói — só deixa o mundo inteiro mais perigoso e mais
+    // generoso em recompensa (ver `Zona.multiplicadorDeCiclo`).
+    var novoCicloBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.title2)
+                    .foregroundColor(.purple)
+                    .frame(width: 32)
+                VStack(alignment: .leading) {
+                    Text("Novo Ciclo").font(.headline)
+                    Text(vm.heroi.cicloNewGamePlus > 0 ? "Ciclo atual: \(vm.heroi.cicloNewGamePlus)" : "Ainda não iniciado")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            Text("O selo sempre se rompe de novo. Inicie um novo ciclo e o mundo inteiro fica mais perigoso — e mais generoso em Runas — sem que você perca nada do que já conquistou.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Button("Iniciar Novo Ciclo") {
+                mensagem = vm.heroi.iniciarNovoCicloNewGamePlus()
+            }
+            .font(.subheadline)
+            .fontWeight(.bold)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Color.purple)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+        .padding()
+        .background(Color.purple.opacity(0.08))
+        .cornerRadius(12)
     }
 
     func pnjBox(_ pnj: PNJ) -> some View {

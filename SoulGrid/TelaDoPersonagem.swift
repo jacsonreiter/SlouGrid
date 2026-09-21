@@ -48,7 +48,7 @@ struct TelaDoPersonagem: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("\(vm.heroi.classe.rawValue) · Nível \(vm.heroi.nivel)")
+            Text("\(vm.heroi.classe.rawValue) · Nível \(vm.heroi.nivel)\(vm.heroi.cicloNewGamePlus > 0 ? " · Ciclo \(vm.heroi.cicloNewGamePlus)" : "")")
                 .font(.title3)
                 .foregroundColor(.secondary)
         }

@@ -49,7 +49,7 @@ struct TelaDeMasmorras: View {
             Group {
                 if let zona = zonaParaExplorar {
                     NavigationLink(
-                        destination: TelaDeCombate(zona: zona, contraChefe: false, nivelHeroi: vm.heroi.nivel, elite: eliteParaExplorar),
+                        destination: TelaDeCombate(zona: zona, contraChefe: false, nivelHeroi: vm.heroi.nivel, elite: eliteParaExplorar, cicloNewGamePlus: vm.heroi.cicloNewGamePlus),
                         isActive: $navegandoParaExploracao
                     ) { EmptyView() }
                 }
@@ -174,7 +174,7 @@ struct TelaDeMasmorras: View {
                             .cornerRadius(10)
                     }
 
-                    NavigationLink(destination: TelaDeCombate(zona: zona, contraChefe: true, nivelHeroi: vm.heroi.nivel)) {
+                    NavigationLink(destination: TelaDeCombate(zona: zona, contraChefe: true, nivelHeroi: vm.heroi.nivel, cicloNewGamePlus: vm.heroi.cicloNewGamePlus)) {
                         Text("Desafiar Chefe")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)

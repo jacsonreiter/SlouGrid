@@ -23,6 +23,14 @@ struct Zona: Identifiable {
     // ali.
     private static let alcanceDeEscalaAcimaDaZona = 6
 
+    // New Game+ (ver `Personagem.cicloNewGamePlus`): +25% de vida/força/
+    // defesa/recompensa por ciclo, linear (não composto) de propósito —
+    // depois de vários ciclos o número continua alto mas nunca absurdo,
+    // já que o jogador pode iniciar quantos ciclos quiser em sequência.
+    static func multiplicadorDeCiclo(_ ciclo: Int) -> Double {
+        1.0 + Double(ciclo) * 0.25
+    }
+
     // Defesa cresce mais rápido que antes (2×nível em vez de 1×) — o motivo
     // é puramente contra o burst de magia de alto Inteligência: antes um
     // nuke de mago no fim de jogo simplesmente ignorava a defesa e matava
@@ -30,37 +38,39 @@ struct Zona: Identifiable {
     // e Força ficam como estavam: o principal reforço de perigo agora vem
     // da quantidade de inimigos por encontro (`gerarGrupoComum`), não de
     // cada um ficar individualmente mais tanque.
-    func gerarInimigoComum(nivelHeroi: Int) -> Inimigo {
+    func gerarInimigoComum(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
         let nivel = min(nivelBaseInimigos + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos, nivelHeroi))
-        let vida = 24 + nivel * 11
+        let multiplicador = Zona.multiplicadorDeCiclo(cicloNewGamePlus)
+        let vida = Int(Double(24 + nivel * 11) * multiplicador)
         return Inimigo(
             nome: nomesInimigos.randomElement() ?? nome,
             icone: iconeInimigos,
             nivel: nivel,
             vidaMaxima: vida,
             vidaAtual: vida,
-            forca: 5 + nivel * 3,
-            defesa: 2 + nivel * 2,
-            xpRecompensa: 14 + nivel * 7,
-            ouroRecompensa: (6 + nivel * 3)...(12 + nivel * 5),
+            forca: Int(Double(5 + nivel * 3) * multiplicador),
+            defesa: Int(Double(2 + nivel * 2) * multiplicador),
+            xpRecompensa: Int(Double(14 + nivel * 7) * multiplicador),
+            ouroRecompensa: Int(Double(6 + nivel * 3) * multiplicador)...Int(Double(12 + nivel * 5) * multiplicador),
             chefe: false,
             zonaOrigem: nome
         )
     }
 
-    func gerarChefe(nivelHeroi: Int) -> Inimigo {
+    func gerarChefe(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
         let nivel = min(nivelBaseInimigos + 4 + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos + 4, nivelHeroi + 2))
-        let vida = 70 + nivel * 18
+        let multiplicador = Zona.multiplicadorDeCiclo(cicloNewGamePlus)
+        let vida = Int(Double(70 + nivel * 18) * multiplicador)
         return Inimigo(
             nome: nomeChefe,
             icone: iconeChefe,
             nivel: nivel,
             vidaMaxima: vida,
             vidaAtual: vida,
-            forca: 10 + nivel * 4,
-            defesa: 6 + nivel * 3,
-            xpRecompensa: 120 + nivel * 14,
-            ouroRecompensa: (60 + nivel * 8)...(110 + nivel * 12),
+            forca: Int(Double(10 + nivel * 4) * multiplicador),
+            defesa: Int(Double(6 + nivel * 3) * multiplicador),
+            xpRecompensa: Int(Double(120 + nivel * 14) * multiplicador),
+            ouroRecompensa: Int(Double(60 + nivel * 8) * multiplicador)...Int(Double(110 + nivel * 12) * multiplicador),
             chefe: true,
             zonaOrigem: nome
         )
@@ -73,9 +83,9 @@ struct Zona: Identifiable {
     // grupo não é a vida/força de cada um (que não mudou), é ter que
     // dividir atenção enquanto todos os que ainda estão de pé atacam a
     // cada turno.
-    func gerarGrupoComum(nivelHeroi: Int) -> [Inimigo] {
+    func gerarGrupoComum(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> [Inimigo] {
         (0..<Zona.tamanhoDoGrupo(nivelBaseInimigos: nivelBaseInimigos)).map { _ in
-            gerarInimigoComum(nivelHeroi: nivelHeroi)
+            gerarInimigoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
         }
     }
 
@@ -102,8 +112,8 @@ struct Zona: Identifiable {
     // Um inimigo comum "inflado" para servir de field boss — mais vida,
     // força e defesa que o normal da zona, com recompensa maior, mas sem
     // contar pra vitórias do chefe nem dar Grande Rúnica.
-    func gerarInimigoDeElite(nivelHeroi: Int) -> Inimigo {
-        var inimigo = gerarInimigoComum(nivelHeroi: nivelHeroi)
+    func gerarInimigoDeElite(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
+        var inimigo = gerarInimigoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
         inimigo.nome = "\(inimigo.nome) de Elite"
         inimigo.vidaMaxima = Int(Double(inimigo.vidaMaxima) * 1.6)
         inimigo.vidaAtual = inimigo.vidaMaxima

@@ -937,3 +937,56 @@ ressalva de sempre. Ponto de atenção pro próximo playtest: as 3 rolagens
 de material novas (zona/quinquilharia/descoberta) nunca foram testadas
 juntas, vale sentir se materiais estão dropando rápido demais ou devagar
 demais pra completar as missões de coleta num ritmo razoável.
+
+## New Game+ em vez de expandir o mundo até o nível 160 (mesma sessão)
+
+O usuário gostou do resultado e pediu mais história — perguntou se
+devíamos continuar expandindo o mundo (mais 3 histórias de 40 níveis
+cada, novos mundos/vilas, convergindo num final geral no nível 160) ou,
+alternativamente, fazer um New Game+ como o de Elden Ring, e deu
+liberdade criativa total pra decidir.
+
+**Decisão: New Game+.** Motivo: 3 mundos/vilas inteiros novos (cada um
+precisando do mesmo tanto de conteúdo que a Vila atual — zonas, NPCs,
+missões, itens, criaturas) é um projeto muito maior que tudo que já foi
+feito nesta sessão somado, difícil de balancear sem playtest real, e
+adia indefinidamente "focar no desenvolvimento de batalhas e
+personagens" (a própria razão que o usuário deu pra considerar a
+alternativa). New Game+ entrega o mesmo objetivo — um motivo real pra
+continuar jogando depois do fim da trama — com uma fração do código, e é
+literalmente fiel ao próprio jogo que inspira o projeto.
+
+- **`Personagem.cicloNewGamePlus: Int`** (novo campo persistido). Elegível
+  quando `missoesEntregues.contains("marco_nivel_40")` — ou seja, depois
+  de fechar "O Selo Final". Diferente do NG+ de verdade de Elden Ring,
+  **não** exige derrotar o chefe final de novo a cada ciclo (fica
+  disponível pra sempre depois da primeira vez) — simplificado de
+  propósito pra não travar o jogador atrás de uma rejogada inteira só
+  pra avançar de ciclo.
+- **`Personagem.iniciarNovoCicloNewGamePlus()`**: incrementa o ciclo.
+  Personagem, nível, equipamento, Runas, inventário, missões — nada é
+  resetado. Só o mundo muda.
+- **`Zona.multiplicadorDeCiclo(_ ciclo:)`**: `1.0 + ciclo × 0.25` — linear,
+  não composto, pra não virar número absurdo se o jogador iniciar vários
+  ciclos em sequência sem jogar entre eles (não há trava pra isso).
+  Aplicado a vida/força/defesa/recompensa (XP e Runas) de
+  `gerarInimigoComum`/`gerarChefe`/`gerarInimigoDeElite` — todo mundo
+  passou a receber `cicloNewGamePlus: Int = 0` (default, então nada
+  quebra pra quem nunca inicia um ciclo). `TelaDeCombate` guarda o ciclo
+  como `let` (mesmo motivo de guardar `nivelHeroi`: "Continuar
+  Explorando" regenera inimigos sem sair da tela) e os dois pontos de
+  `TelaDeMasmorras` que criam `TelaDeCombate` passam
+  `vm.heroi.cicloNewGamePlus`.
+- **UI**: `TelaDaVila` ganhou uma seção "Novo Ciclo" (só visível quando
+  elegível) com um botão que chama `iniciarNovoCicloNewGamePlus()` — a
+  mesma Ancião Toren narra a transição (3 textos diferentes: ciclo 1,
+  ciclo 2, ciclo 3+). `TelaDoPersonagem` mostra "· Ciclo N" ao lado do
+  nível no cabeçalho quando `cicloNewGamePlus > 0`.
+
+Ainda não implementado (considerado, fora de escopo por ora): missões
+exclusivas de New Game+ (o catálogo de missões continua o mesmo,
+`missoesEntregues` não reseta — então nada pra fazer de novo na Vila
+além de repetir masmorras mais difíceis); gate de "precisa derrotar o
+chefe final de novo" por ciclo, como o Elden Ring de verdade faz. Os
+dois dariam mais profundidade ao sistema se a base (o multiplicador em
+si) se provar divertida no playtest.
