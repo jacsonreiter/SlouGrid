@@ -180,15 +180,22 @@ struct Item: Codable, Identifiable {
             || bonus.bonusRaridadeDeItem != 0
     }
 
-    static let nivelMaximoDeEvolucao = 10
+    // Estilo Elden Ring: armas normais evoluem até +25 (Pedras de Ferreiro,
+    // tier crescente a cada poucos níveis — ver `pedraDeForja(paraNivelDeEvolucao:)`),
+    // armas especiais até +10 (Pedras Sublimes). Como este jogo não separa
+    // arma "especial" de comum, todo item usa a trilha longa de +25 — o
+    // topo é uma meta de fim de jogo de verdade, farmada aos poucos, igual
+    // ao jogo que inspira o sistema.
+    static let nivelMaximoDeEvolucao = 25
 
     // Bônus efetivo do item já considerando a evolução na Forja: cada nível
-    // soma +8% sobre os atributos base da peça (até +80% no nível máximo).
-    // Itens não evoluídos (a esmagadora maioria, incluindo tudo que não é
-    // arma/armadura) têm `nivelDeEvolucao == 0` e retornam `bonus` puro.
+    // soma +4% sobre os atributos base da peça (até +100%, ou seja o dobro,
+    // no nível máximo +25). Itens não evoluídos (a esmagadora maioria,
+    // incluindo tudo que não é arma/armadura) têm `nivelDeEvolucao == 0` e
+    // retornam `bonus` puro.
     var bonusEvoluido: BonusDeAtributos {
         guard nivelDeEvolucao > 0 else { return bonus }
-        let multiplicador = 1.0 + Double(nivelDeEvolucao) * 0.08
+        let multiplicador = 1.0 + Double(nivelDeEvolucao) * 0.04
         var escalado = bonus
         escalado.forca = Int(Double(bonus.forca) * multiplicador)
         escalado.vitalidade = Int(Double(bonus.vitalidade) * multiplicador)
@@ -590,11 +597,11 @@ extension Item {
 
     // MARK: - Pedras de Forja (evolução de arma/armadura)
 
-    // Uma pedra por raridade — a mesma escala usada pelo loot de
-    // equipamento (`lootAleatorio`), então uma arma Rara sempre pede Pedra
-    // de Forja Rara pra evoluir, nunca uma tier desencontrada. Só dropam
-    // (ver `Personagem.receberRecompensa`), nunca compram — é sempre um
-    // troféu de exploração/combate, como os materiais de zona.
+    // Uma pedra por raridade, mesma escala usada pelo loot de equipamento
+    // (`lootAleatorio`) — assim, quanto mais fundo numa zona perigosa,
+    // melhor a tier de pedra que pode cair, exatamente como o resto do
+    // loot. Só dropam (ver `Personagem.receberRecompensa`), nunca compram —
+    // é sempre um troféu de exploração/combate, como os materiais de zona.
     static let pedrasDeForja: [Item] = [
         Item(nome: "Pedra de Forja Comum", tipo: .material, valor: 0, preco: 20, raridade: .comum),
         Item(nome: "Pedra de Forja Incomum", tipo: .material, valor: 0, preco: 45, raridade: .incomum),
@@ -617,6 +624,26 @@ extension Item {
         case ..<4: indice = 0
         case 4..<8: indice = 1
         case 8..<13: indice = 2
+        default: indice = 3
+        }
+        return pedraDeForja(paraRaridade: ordem[indice])
+    }
+
+    // Qual tier de Pedra de Forja um reforço EXIGE, dado o nível de
+    // evolução ATUAL da peça (0 a 24, pedindo a pedra pro próximo passo) —
+    // estilo real de Elden Ring: a tier da pedra é gated pelo progresso do
+    // reforço em si (Smithing Stone [1] pros primeiros níveis, [2] pros
+    // seguintes, e assim por diante), não pela raridade da arma/armadura
+    // (uma arma Comum e uma Épica pedem exatamente a mesma pedra pra ir de
+    // +6 pra +7). Só usada pro CUSTO do reforço — o drop continua ligado à
+    // zona (`paraNivelInimigo`, acima).
+    static func pedraDeForja(paraNivelDeEvolucao nivel: Int) -> Item {
+        let ordem: [Raridade] = [.comum, .incomum, .raro, .epico]
+        let indice: Int
+        switch nivel {
+        case ..<6: indice = 0
+        case 6..<12: indice = 1
+        case 12..<18: indice = 2
         default: indice = 3
         }
         return pedraDeForja(paraRaridade: ordem[indice])

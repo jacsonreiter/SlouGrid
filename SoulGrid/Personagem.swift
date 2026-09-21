@@ -1043,14 +1043,19 @@ struct Personagem: Codable {
 
     // MARK: - Forja (evolução de arma/armadura)
 
-    // Custo pra levar uma peça do nível atual pro próximo: Pedras de Forja
-    // sobem 1 por nível (o 1º reforço custa 1, o 10º custa 10 — o topo exige
-    // ter farmado de verdade, não só ter tido sorte uma vez), sempre da
-    // mesma tier da raridade da peça (ver `Item.pedraDeForja(paraRaridade:)`).
-    // Público (não só usado por `evoluir`) pra a tela da Vila conseguir
-    // mostrar o custo antes do jogador confirmar.
+    // Custo pra levar uma peça do nível atual pro próximo, na trilha longa
+    // de 25 (ver `Item.nivelMaximoDeEvolucao`): a TIER da pedra exigida
+    // sobe com o progresso do reforço em si, não com a raridade da peça
+    // (ver `Item.pedraDeForja(paraNivelDeEvolucao:)` — o motivo está lá).
+    // A quantidade cresce devagar (2 a cada reforço, +1 a cada 3 níveis) —
+    // farmar até +25 é uma meta de fim de jogo de verdade (~150+ pedras no
+    // total), não algo pra terminar numa tarde. Público (não só usado
+    // pelos `evoluir*`) pra a tela da Vila mostrar o custo antes de confirmar.
     func custoParaEvoluir(_ item: Item) -> (pedra: Item, quantidadePedra: Int, custoRunas: Int) {
-        (Item.pedraDeForja(paraRaridade: item.raridade), item.nivelDeEvolucao + 1, 80 + item.nivelDeEvolucao * 60)
+        let pedra = Item.pedraDeForja(paraNivelDeEvolucao: item.nivelDeEvolucao)
+        let quantidadePedra = 2 + item.nivelDeEvolucao / 3
+        let custoRunas = 60 + item.nivelDeEvolucao * 35
+        return (pedra, quantidadePedra, custoRunas)
     }
 
     // Evolui a peça equipada (arma OU armadura), consumindo Pedras de Forja

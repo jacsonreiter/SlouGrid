@@ -34,46 +34,63 @@ struct Zona: Identifiable {
         1.0 + Double(ciclo) * 0.35
     }
 
-    // Defesa cresce mais rápido que antes (2×nível em vez de 1×) — o motivo
-    // é puramente contra o burst de magia de alto Inteligência: antes um
-    // nuke de mago no fim de jogo simplesmente ignorava a defesa e matava
-    // em 1-2 golpes qualquer coisa, trivializando masmorras avançadas. Vida
-    // e Força ficam como estavam: o principal reforço de perigo agora vem
-    // da quantidade de inimigos por encontro (`gerarGrupoComum`), não de
-    // cada um ficar individualmente mais tanque.
+    // Rebalanceado depois de um playtest real mostrar que o jogo estava
+    // trivial de verdade: uma Bola de Fogo de nível 1 (sem cajado nenhum)
+    // fazia ~36 de dano contra um inimigo comum de nível 1 com só 35 de
+    // vida e 4 de defesa — ou seja, MATAVA COM UM CAST SÓ. O mesmo valia
+    // pro Guerreiro (Golpe Poderoso já quase zerava um inimigo sozinho) e
+    // pro Ladino. O problema nunca foi uma classe específica: era a
+    // fórmula de vida/defesa do inimigo comum, calibrada tempos atrás e
+    // nunca revalidada depois de todo o poder de dano que entrou na build
+    // (evolução de arma, magias novas, etc.) — daí "sem playtest real"
+    // sempre ter sido a ressalva nas notas de desenvolvimento.
+    //
+    // A correção segue a filosofia real de Dark Souls/Elden Ring: quando o
+    // dano do jogador cresce, o jogo não pune isso capando o dano — ele
+    // aumenta a vida/resistência do mundo (Margit tem muito mais vida que
+    // um soldado comum; NG+ deixa tudo mais tanque, não te deixa mais
+    // fraco). Vida quase triplicou na base e quase dobrou no coeficiente
+    // por nível; Defesa subiu de leve de novo (ainda existe especificamente
+    // pra não deixar burst mágico ignorar a resistência). O alvo calibrado
+    // à mão: um golpe/magia de abertura forte (não a magia mais fraca do
+    // grimório) deve precisar de 2-3 acertos pra derrubar um inimigo comum
+    // do MESMO nível — nunca 1, mas também sem virar uma maratona.
     func gerarInimigoComum(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
         let nivel = min(nivelBaseInimigos + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos, nivelHeroi))
         let multiplicador = Zona.multiplicadorDeCiclo(cicloNewGamePlus)
-        let vida = Int(Double(24 + nivel * 11) * multiplicador)
+        let vida = Int(Double(45 + nivel * 22) * multiplicador)
         return Inimigo(
             nome: nomesInimigos.randomElement() ?? nome,
             icone: iconeInimigos,
             nivel: nivel,
             vidaMaxima: vida,
             vidaAtual: vida,
-            forca: Int(Double(5 + nivel * 3) * multiplicador),
-            defesa: Int(Double(2 + nivel * 2) * multiplicador),
-            xpRecompensa: Int(Double(14 + nivel * 7) * multiplicador),
-            ouroRecompensa: Int(Double(6 + nivel * 3) * multiplicador)...Int(Double(12 + nivel * 5) * multiplicador),
+            forca: Int(Double(7 + nivel * 4) * multiplicador),
+            defesa: Int(Double(6 + nivel * 3) * multiplicador),
+            xpRecompensa: Int(Double(20 + nivel * 10) * multiplicador),
+            ouroRecompensa: Int(Double(9 + nivel * 4) * multiplicador)...Int(Double(17 + nivel * 7) * multiplicador),
             chefe: false,
             zonaOrigem: nome
         )
     }
 
+    // Mesma correção que `gerarInimigoComum` (ver comentário lá), aplicada
+    // proporcionalmente ao chefe: continua sendo o inimigo mais duro da
+    // zona por uma boa margem, não só um comum "inflado".
     func gerarChefe(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
         let nivel = min(nivelBaseInimigos + 4 + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos + 4, nivelHeroi + 2))
         let multiplicador = Zona.multiplicadorDeCiclo(cicloNewGamePlus)
-        let vida = Int(Double(70 + nivel * 18) * multiplicador)
+        let vida = Int(Double(130 + nivel * 34) * multiplicador)
         return Inimigo(
             nome: nomeChefe,
             icone: iconeChefe,
             nivel: nivel,
             vidaMaxima: vida,
             vidaAtual: vida,
-            forca: Int(Double(10 + nivel * 4) * multiplicador),
-            defesa: Int(Double(6 + nivel * 3) * multiplicador),
-            xpRecompensa: Int(Double(120 + nivel * 14) * multiplicador),
-            ouroRecompensa: Int(Double(60 + nivel * 8) * multiplicador)...Int(Double(110 + nivel * 12) * multiplicador),
+            forca: Int(Double(15 + nivel * 6) * multiplicador),
+            defesa: Int(Double(11 + nivel * 5) * multiplicador),
+            xpRecompensa: Int(Double(170 + nivel * 20) * multiplicador),
+            ouroRecompensa: Int(Double(85 + nivel * 12) * multiplicador)...Int(Double(150 + nivel * 16) * multiplicador),
             chefe: true,
             zonaOrigem: nome
         )

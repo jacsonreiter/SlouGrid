@@ -1129,3 +1129,106 @@ real**. Pontos de atenção pro próximo playtest: os limiares de 100 de
 acúmulo pra Sangramento/Calafrio (rápido demais? devagar demais?), e se
 o custo de Pedras de Forja (nível atual + 1, crescendo até 10 na peça
 +10) soa justo dado o novo ritmo de drop.
+
+## Rebalance real de dificuldade + Forja até +25, estilo Elden Ring (mesma sessão, primeiro playtest de verdade)
+
+Essa é a primeira vez na sessão inteira que o usuário reportou um número
+concreto de gameplay em vez de "gostei"/"quero mais": criou um Mago
+novo e derrotava inimigo com **uma Bola de Fogo e um ataque básico**,
+sem nem cajado equipado. Pediu pra estudar a fundo escala de
+dificuldade em Elden Ring, todos os Dark Souls e jogos menores, e trazer
+o sistema de evolução de arma de Elden Ring de verdade.
+
+### O diagnóstico (matemática, não achismo)
+
+Fazendo a conta com os números reais do jogo: um Mago recém-criado tem
+Inteligência base 18 (`ClasseDePersonagem.inteligenciaBase`). Bola de
+Fogo (`multiplicadorDano: 2.0`) contra um inimigo comum de zona 1,
+nível 1: dano bruto = `18 × 2.0 = 36`. O inimigo tinha `vida: 24 + nível
+× 11 = 35` e `defesa: 2 + nível × 2 = 4`. Dano final = `36 − 4 = 32`.
+**Um cast matava um inimigo de 35 de vida.** Conferi Guerreiro (Golpe
+Poderoso, `×2.2`) e o resultado era o mesmo problema: força inicial 14
+(+6 da espada Comum) × 2.2 = 44 bruto, quase zerando o mesmo inimigo
+sozinho. Não era bug de uma classe — era a fórmula de vida/defesa do
+inimigo comum, calibrada há muitas sessões atrás e nunca revalidada
+depois de tanto poder de dano ter entrado no jogo (evolução de arma,
+magias novas, Grandes Rúnicas, talismãs). Toda nota de sessão anterior
+tinha o aviso "sem playtest real" — esse era exatamente o tipo de
+problema que só aparece jogando de verdade, não lendo código.
+
+### O que a pesquisa trouxe
+
+- **Filosofia Dark Souls/Elden Ring**: quando o dano do jogador cresce
+  (build, equipamento, nível), o jogo raramente capa esse dano — ele
+  aumenta a vida/resistência do mundo. Um chefe tem vida muito acima de
+  um inimigo comum; NG+ deixa tudo mais tanque, nunca deixa o jogador
+  mais fraco. Confirma a decisão de mexer nas fórmulas do `Inimigo`, não
+  nos multiplicadores das magias/builds que acabaram de ser construídas.
+- **Smithing Stones de Elden Ring** ([Fextralife](https://eldenring.wiki.fextralife.com/Smithing_Stones), [GameSpot](https://www.gamespot.com/articles/elden-ring-how-to-upgrade-weapons-smithing-stones-explained/1100-6501026/)):
+  armas normais evoluem até **+25**, com a tier de pedra exigida subindo
+  a cada poucos níveis de reforço (Pedra [1] pros primeiros níveis, [2]
+  pros seguintes, e assim por diante) — a tier depende do **progresso do
+  reforço em si**, não da raridade da arma. Armas especiais (Somber) vão
+  só até +10. Base direta da nova Forja abaixo.
+- **Design de dano em RPGs por turno** (fóruns RPG Maker/itch.io):
+  fórmulas de subtração simples (`dano = ataque − defesa`, o mesmo
+  modelo que este jogo já usa) são ótimas pra previsibilidade, mas
+  quebram fácil se a defesa do inimigo não acompanhar o crescimento do
+  ataque do jogador — exatamente o que tinha acontecido aqui.
+
+### Fórmulas de `Inimigo` reescritas (`Zona.swift`)
+
+Alvo calibrado à mão: um golpe/magia de abertura forte precisa de
+**2-3 acertos** pra derrubar um inimigo comum do mesmo nível — nunca 1,
+mas sem virar maratona; o ataque básico "de graça" (sem gastar energia)
+fica mais fraco de propósito, {~5-6 golpes}, pra empurrar o jogador a
+usar o grimório/Golpe de Arma como ferramenta principal, não só o botão
+"Atacar".
+
+| | Antes | Depois |
+|---|---|---|
+| Vida (comum) | `24 + nível×11` | `45 + nível×22` |
+| Defesa (comum) | `2 + nível×2` | `6 + nível×3` |
+| Força (comum) | `5 + nível×3` | `7 + nível×4` |
+| Vida (chefe) | `70 + nível×18` | `130 + nível×34` |
+| Defesa (chefe) | `6 + nível×3` | `11 + nível×5` |
+| Força (chefe) | `10 + nível×4` | `15 + nível×6` |
+
+Recompensas (XP/Runas) subiram na mesma proporção pra grind continuar
+compensando. Conferido por simulação em Python (não só leitura): Mago
+nível 1 sem cajado agora precisa de ~2-3 casts de Bola de Fogo pra
+matar um comum (antes: 1); Guerreiro nível 1 com Espada Curta precisa
+de ~6 ataques básicos ou ~2 Golpes Poderosos (antes: ~2 e ~1). Um chefe
+de zona continua exigindo preparo de verdade antes de desafiar — igual
+sempre foi, só que agora numa base de inimigo comum que não é mais
+trivial.
+
+### Forja: trilha longa até +25 (era até +10)
+
+- **`Item.nivelMaximoDeEvolucao`**: `10` → `25`. **`Item.bonusEvoluido`**:
+  `+8%/nível` (até +80%) → `+4%/nível` (até **+100%**, ou seja o dobro,
+  em +25) — mantém o teto de poder final parecido, só espalhado por uma
+  trilha bem mais longa.
+- **Mudança mais fiel ao jogo original**: a tier de Pedra de Forja
+  exigida pra um reforço agora depende do **nível de evolução ATUAL da
+  peça** (`Item.pedraDeForja(paraNivelDeEvolucao:)`, níveis 0-5 pedem
+  Comum, 6-11 Incomum, 12-17 Raro, 18-24 Épica), não mais da raridade da
+  arma/armadura em si — exatamente como Smithing Stone [1] serve
+  qualquer arma normal indo de +1 a +3, seja ela comum ou rara. A
+  função antiga (`paraRaridade:`) continua existindo, só que agora só
+  serve pro DROP (qual pedra um inimigo de tal zona pode largar), não
+  mais pro custo.
+- **`Personagem.custoParaEvoluir`**: quantidade de pedra por reforço caiu
+  de `nível+1` pra `2 + nível/3` (cresce bem mais devagar, já que agora
+  são 25 níveis em vez de 10); custo de Runas ajustado de `80 + nível×60`
+  pra `60 + nível×35`. Upgradar uma peça do zero até +25 agora pede
+  ~150+ pedras no total, somando as 4 tiers — uma meta de fim de jogo de
+  verdade, não algo pra terminar numa tarde, igual ao jogo original.
+
+Validado por leitura + balanceamento de chaves/parênteses + auditoria de
+ordem de argumentos + **simulação numérica em Python** dos cenários de
+combate acima (a primeira vez que uma mudança de balanceamento desta
+sessão foi verificada com números de verdade antes de subir, não só
+"parece razoável"). Ainda **sem playtest real no dispositivo** — o
+próximo teste do usuário é o que vai validar se os alvos de "2-3
+acertos" acertaram a mão ou precisam de mais um ajuste.
