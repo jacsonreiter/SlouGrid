@@ -46,6 +46,11 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles
 
+          # UUID do profile, pro Archive referenciar via PROVISIONING_PROFILE
+          # (assinatura manual, ver comentário no step Archive abaixo).
+          PROFILE_UUID=$(security cms -D -i "$PP_PATH" | /usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin)
+          echo "PROVISIONING_PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+
       # A chave da App Store Connect API autentica o xcodebuild direto com a
       # Apple (renovar profile, e depois enviar o build) — sem precisar de
       # Apple ID + senha de app.
@@ -75,16 +80,18 @@ jobs:
           tail -n 1 "$API_KEY_PATH"
 
       # O projeto usa CODE_SIGN_STYLE=Automatic sem CODE_SIGN_IDENTITY
-      # explícito em nenhuma configuração, então o Xcode cai no padrão do
-      # SDK iphoneos ("iPhone Developer") mesmo em Release/Archive. Isso
-      # fazia o archive falhar procurando um certificado de Desenvolvimento
-      # que nunca foi importado (só o de Distribuição existe no keychain
-      # deste runner). Forçar "Apple Distribution" aqui resolve sem precisar
-      # mexer no pbxproj (que o Xcode local do usuário também usa).
+      # explícito em nenhuma configuração. Automatic sempre assina com a
+      # identidade de Desenvolvimento (é assim que a Apple projetou:
+      # distribuição só entra no passo de export) — por isso o run anterior
+      # falhou pedindo um certificado "iOS Development" que nunca foi
+      # importado (só o de Distribuição está no keychain deste runner).
+      # Forçar CODE_SIGN_IDENTITY="Apple Distribution" sem mudar o estilo
+      # também falha ("conflicting provisioning settings"), porque Automatic
+      # e uma identidade de Distribuição são incompatíveis entre si.
+      # Solução: assinatura manual só neste step, usando exatamente o
+      # certificado + profile já importados (nenhuma negociação com a Apple
+      # é necessária aqui — só o export/upload logo abaixo precisa da API key).
       - name: Archive
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
         run: |
           xcodebuild archive \
             -project SoulGrid.xcodeproj \
@@ -92,11 +99,9 @@ jobs:
             -configuration Release \
             -archivePath "$RUNNER_TEMP/SoulGrid.xcarchive" \
             -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$API_KEY_PATH" \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROVISIONING_PROFILE_UUID"
 
       # exportArchive com destination=upload no ExportOptions.plist exporta
       # E envia pro App Store Connect num passo só.
