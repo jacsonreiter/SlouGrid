@@ -712,6 +712,14 @@ struct Personagem: Codable {
             potenciaDoFrasco += item.valor
             diminuirPilha(emIndice: indice)
             return "Você consumiu \(item.nome)! O Frasco Sagrado agora cura/restaura +\(item.valor)% a mais por uso."
+        case .fortalecimento:
+            // O buff em si (`item.efeitoDeBuffTemporario`) só é aplicado
+            // por `TelaDeCombate.usarItem`, que tem acesso ao estado de
+            // fortalecimento temporário do combate — aqui só consome o
+            // item. A tela esconde o botão "Usar" desse tipo fora de
+            // combate, então esse branch só roda quando já tem efeito real.
+            diminuirPilha(emIndice: indice)
+            return "Você usou \(item.nome)!"
         }
     }
 

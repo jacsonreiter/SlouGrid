@@ -312,10 +312,19 @@ struct TelaDoPersonagem: View {
             }
             Spacer()
             if pilha.item.tipo == .pocao {
-                Button("Usar") {
-                    mensagem = vm.heroi.usarItem(pilha)
+                if pilha.item.efeitoDePocao == .fortalecimento {
+                    // Poção de buff: só tem efeito em combate (mexe no
+                    // estado temporário de `TelaDeCombate`), então não
+                    // oferece "Usar" aqui pra não desperdiçar o item à toa.
+                    Text("Use em combate")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Button("Usar") {
+                        mensagem = vm.heroi.usarItem(pilha)
+                    }
+                    .foregroundColor(.green)
                 }
-                .foregroundColor(.green)
             } else {
                 Button("Equipar") {
                     mensagem = vm.heroi.equiparItem(pilha)

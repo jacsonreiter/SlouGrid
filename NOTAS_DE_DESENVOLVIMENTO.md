@@ -495,6 +495,57 @@ na hora, com custo por atributo individual (soft cap tipo Ragnarok Online)
 - Validado só lendo o código com cuidado — sem Xcode/simulador neste
   ambiente. **Ainda não jogado** com essa versão.
 
+## Mercado com abas + expansão grande do catálogo (sessão seguinte)
+
+Pedido do usuário: organizar o Mercado em abas (Poções/Armas/Armaduras/
+Acessórios/Talismãs) e criar itens novos "usando a imaginação", pra todas
+as classes.
+
+- **`TelaDoMercado` ganhou abas** (`AbaDoMercado`, `Picker` segmentado no
+  topo). Acessórios e Talismãs usam o mesmo `TipoDeItem.acessorio` por
+  baixo — a separação é feita por `Item.ehTalisma` (computed: true se
+  algum campo de efeito passivo do `BonusDeAtributos` estiver preenchido),
+  não por um campo novo salvo. Cada aba ordena por `nivelMinimo`.
+- **Poções de fortalecimento — item novo que fechou uma lacuna antiga**
+  (a seção "Ainda não feito" já citava isso há duas sessões: "não há
+  poções de buff temporário"). 12 poções novas (4 atributos × 3 tiers:
+  Força/Defesa/Inteligência/Agilidade, cada uma leve/média/forte), usando
+  um novo `EfeitoDePocao.fortalecimento` + `Item.efeitoDeBuffTemporario:
+  Magia?` — reaproveita o mesmo `Magia.tipo == .fortalecimento` das magias
+  de fortalecimento do grimório, só que em garrafa, disponível pra
+  qualquer classe. A lógica de aplicar o buff (`bonusForcaTemporario` etc.
+  em `TelaDeCombate`) foi extraída pra `aplicarFortalecimento(_ magia:)`,
+  reaproveitada tanto por `lancarMagia` quanto pelo novo caminho em
+  `usarItem`. **Importante**: só funciona em combate (mexe em `@State` que
+  só existe em `TelaDeCombate`); `Personagem.usarItem` só consome o item e
+  devolve uma mensagem genérica quando `efeito == .fortalecimento` — quem
+  aplica o bônus de verdade é `TelaDeCombate.usarItem`. Por isso
+  `TelaDoPersonagem.linhaDaMochila` esconde o botão "Usar" desse tipo de
+  poção fora de combate (mostra "Use em combate" em cinza), senão o
+  jogador desperdiçaria o item sem efeito nenhum.
+- **6 armas novas** (2 por classe, níveis 7 e 13, preenchendo os buracos
+  entre os tiers já existentes de 1/5/10/15/18): Martelo da Fúria/Alabarda
+  Rúnica (Guerreiro), Tomo Sombrio/Cristal do Abismo (Mago), Kunais
+  Gêmeas/Foice das Sombras (Ladino) — cada uma com identidade própria
+  (ex: Martelo troca Destreza por mais Força; Tomo Sombrio aposta em
+  veneno em vez de dano direto), todas com seu próprio Golpe de Arma.
+- **6 armaduras novas** (2 por classe, mesmos níveis 7/13): Cota
+  Reforçada/Armadura do Bastião (Guerreiro), Manto Etéreo/Vestes do
+  Oráculo (Mago), Capa Élfica/Manto do Andarilho (Ladino).
+- **3 acessórios novos**: Anel Gêmeo (Força+Agilidade) e Colar do
+  Estudioso (Inteligência+Sorte) no nível 7, e Anel do Equilíbrio (+3 em
+  TODOS os 6 atributos) no nível 16 como item de fim de jogo "sem
+  resposta errada".
+- **3 talismãs novos**: Talismã do Mercador Itinerante (ouro+chance de
+  item combinados, nível 4), Talismã do Caçador (chance de item, nível 5),
+  Talismã do Vínculo Sombrio (os dois regens — vida E energia — numa peça
+  só, nível 9).
+- Nenhum arquivo novo foi criado (só editados os existentes), então não
+  precisou mexer no `project.pbxproj`.
+- Validado só lendo o código com cuidado, incluindo checagem de
+  parênteses/colchetes/chaves balanceados via script — sem Xcode/simulador
+  neste ambiente. **Ainda não jogado** com essa versão.
+
 ## Ainda não feito / ideias em aberto
 
 - **Nenhum playtest real** dos números foi feito — tudo é estimativa

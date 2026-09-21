@@ -449,28 +449,8 @@ struct TelaDeCombate: View {
         }
 
         if magia.tipo == .fortalecimento {
-            var partes: [String] = []
-            if magia.bonusForca > 0 {
-                bonusForcaTemporario = magia.bonusForca
-                turnosDeBonusForca = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusForca) força")
-            }
-            if magia.bonusDefesa > 0 {
-                bonusDefesaTemporaria = magia.bonusDefesa
-                turnosDeBonusDefesa = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusDefesa) defesa")
-            }
-            if magia.bonusInteligencia > 0 {
-                bonusInteligenciaTemporaria = magia.bonusInteligencia
-                turnosDeBonusInteligencia = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusInteligencia) inteligência")
-            }
-            if magia.bonusAgilidade > 0 {
-                bonusAgilidadeTemporaria = magia.bonusAgilidade
-                turnosDeBonusAgilidade = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusAgilidade) agilidade")
-            }
-            log.append("Você usou \(magia.nome)! \(partes.joined(separator: " e ")) por \(magia.duracaoEmTurnos) turnos.")
+            let partes = aplicarFortalecimento(magia)
+            log.append("Você usou \(magia.nome)! \(partes) por \(magia.duracaoEmTurnos) turnos.")
             turnoDoInimigo()
             return
         }
@@ -524,6 +504,37 @@ struct TelaDeCombate: View {
         }
     }
 
+    // Aplica um bônus temporário de combate (Força/Defesa/Inteligência/
+    // Agilidade) e devolve uma descrição textual — usado tanto por magias
+    // de fortalecimento do grimório (`lancarMagia`) quanto por poções de
+    // fortalecimento (`usarItem`, logo abaixo), já que as duas reaproveitam
+    // o mesmo `Magia.tipo == .fortalecimento`.
+    @discardableResult
+    private func aplicarFortalecimento(_ magia: Magia) -> String {
+        var partes: [String] = []
+        if magia.bonusForca > 0 {
+            bonusForcaTemporario = magia.bonusForca
+            turnosDeBonusForca = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusForca) força")
+        }
+        if magia.bonusDefesa > 0 {
+            bonusDefesaTemporaria = magia.bonusDefesa
+            turnosDeBonusDefesa = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusDefesa) defesa")
+        }
+        if magia.bonusInteligencia > 0 {
+            bonusInteligenciaTemporaria = magia.bonusInteligencia
+            turnosDeBonusInteligencia = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusInteligencia) inteligência")
+        }
+        if magia.bonusAgilidade > 0 {
+            bonusAgilidadeTemporaria = magia.bonusAgilidade
+            turnosDeBonusAgilidade = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusAgilidade) agilidade")
+        }
+        return partes.joined(separator: " e ")
+    }
+
     private func usarFrascoDeVida() {
         guard !combateEncerrado else { return }
         log.append(vm.heroi.usarFrascoDeVida())
@@ -539,8 +550,13 @@ struct TelaDeCombate: View {
     private func usarItem(_ pilha: PilhaDeItens) {
         guard !combateEncerrado else { return }
         let efeito = pilha.item.efeitoDePocao
+        let buff = pilha.item.efeitoDeBuffTemporario
         log.append(vm.heroi.usarItem(pilha))
         if efeito == .antidoto { veneno = nil }
+        if efeito == .fortalecimento, let buff = buff {
+            let partes = aplicarFortalecimento(buff)
+            log.append("Efeito: \(partes) por \(buff.duracaoEmTurnos) turnos.")
+        }
         mostrandoItens = false
         turnoDoInimigo()
     }
