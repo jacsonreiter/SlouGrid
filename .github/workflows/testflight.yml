@@ -58,6 +58,22 @@ jobs:
           echo -n "$API_KEY_BASE64" | base64 --decode -o "$RUNNER_TEMP/private_keys/AuthKey_${API_KEY_ID}.p8"
           echo "API_KEY_PATH=$RUNNER_TEMP/private_keys/AuthKey_${API_KEY_ID}.p8" >> "$GITHUB_ENV"
 
+      # Diagnóstico só de FORMATO/TAMANHO — nunca imprime o valor de nenhum
+      # secret. Serve pra achar espaço/quebra de linha extra colada sem
+      # querer, ou um .p8 que não decodificou certo, sem chutar às cegas.
+      - name: Sanity-check API key secrets (no values printed)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          echo "Key ID length (esperado ~10 chars, sem espaço/quebra): ${#API_KEY_ID}"
+          echo "Issuer ID length (esperado 36 chars, formato UUID): ${#API_ISSUER_ID}"
+          echo "p8 file size in bytes (.p8 típico ~230-350 bytes):"
+          wc -c < "$API_KEY_PATH"
+          echo "Primeira e última linha do .p8 decodificado (tem que ser BEGIN/END PRIVATE KEY):"
+          head -n 1 "$API_KEY_PATH"
+          tail -n 1 "$API_KEY_PATH"
+
       - name: Archive
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
