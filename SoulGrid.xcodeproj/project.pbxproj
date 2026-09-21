@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		039F49BE9D2FAD85616005A5 /* TelaDeCombate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8509E1EC7F1FA7723D007B6 /* TelaDeCombate.swift */; };
+		04C0DDB368C9B428FD00DD77 /* TelaDeEquipamento.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */; };
+		0D860A9C6CE7208FD86E6E07 /* PerfilDoJogador.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92FEF1AAB079CFE1DBB87C5 /* PerfilDoJogador.swift */; };
+		3EED14687371310AC04EDFCF /* TelaCriacaoDePersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */; };
+		417DDDAA97747AAC12069029 /* TelaDeMasmorras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */; };
+		4FA7D6D4D30BAA0347C57AA9 /* ClasseDePersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */; };
 		844C15E42FE38FF500A2E5D6 /* TelaDoMercado.swift in Sources */ = {isa = PBXBuildFile; fileRef = 844C15E32FE38FF500A2E5D6 /* TelaDoMercado.swift */; };
 		84B099BC2FE2D73C004C8D0F /* SoulGridApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099BB2FE2D73C004C8D0F /* SoulGridApp.swift */; };
 		84B099BE2FE2D73C004C8D0F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099BD2FE2D73C004C8D0F /* ContentView.swift */; };
@@ -15,21 +21,22 @@
 		84B099CA2FE2DA44004C8D0F /* TelaDoPersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099C92FE2DA44004C8D0F /* TelaDoPersonagem.swift */; };
 		84B099CC2FE2DBEB004C8D0F /* Personagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099CB2FE2DBEB004C8D0F /* Personagem.swift */; };
 		84B099CE2FE2E7E2004C8D0F /* Item.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84B099CD2FE2E7E2004C8D0F /* Item.swift */; };
-		4FA7D6D4D30BAA0347C57AA9 /* ClasseDePersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */; };
-		A630E86271B2E4E2DF19DB3B /* Inimigo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */; };
-		D838EFF7FEAC659311698F95 /* Zona.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0229277D8230F3680457513A /* Zona.swift */; };
-		FEFF1FAE6F897E7969A3C3B0 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C81688D515EA4734D89F42D2 /* GameViewModel.swift */; };
-		3EED14687371310AC04EDFCF /* TelaCriacaoDePersonagem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */; };
-		417DDDAA97747AAC12069029 /* TelaDeMasmorras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */; };
-		039F49BE9D2FAD85616005A5 /* TelaDeCombate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8509E1EC7F1FA7723D007B6 /* TelaDeCombate.swift */; };
-		E0E9C33912A89F2DB8288269 /* Magia.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2465FE8ABC138FB09C67610 /* Magia.swift */; };
-		0D860A9C6CE7208FD86E6E07 /* PerfilDoJogador.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92FEF1AAB079CFE1DBB87C5 /* PerfilDoJogador.swift */; };
 		97323D417D900C0DF3F81924 /* TelaDeCadastro.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EC21B67E2A1FBF146074E96 /* TelaDeCadastro.swift */; };
+		A630E86271B2E4E2DF19DB3B /* Inimigo.swift in Sources */ = {isa = PBXBuildFile; fileRef = CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */; };
 		C63289B7E82FDA18FFBAE902 /* TelaDeHerois.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E768C29500719A658592296 /* TelaDeHerois.swift */; };
-		04C0DDB368C9B428FD00DD77 /* TelaDeEquipamento.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */; };
+		D838EFF7FEAC659311698F95 /* Zona.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0229277D8230F3680457513A /* Zona.swift */; };
+		E0E9C33912A89F2DB8288269 /* Magia.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2465FE8ABC138FB09C67610 /* Magia.swift */; };
+		FEFF1FAE6F897E7969A3C3B0 /* GameViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C81688D515EA4734D89F42D2 /* GameViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0229277D8230F3680457513A /* Zona.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Zona.swift; sourceTree = "<group>"; };
+		12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClasseDePersonagem.swift; sourceTree = "<group>"; };
+		1E768C29500719A658592296 /* TelaDeHerois.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeHerois.swift; sourceTree = "<group>"; };
+		3EC21B67E2A1FBF146074E96 /* TelaDeCadastro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeCadastro.swift; sourceTree = "<group>"; };
+		4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaCriacaoDePersonagem.swift; sourceTree = "<group>"; };
+		4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeMasmorras.swift; sourceTree = "<group>"; };
+		73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeEquipamento.swift; sourceTree = "<group>"; };
 		844C15E32FE38FF500A2E5D6 /* TelaDoMercado.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDoMercado.swift; sourceTree = "<group>"; };
 		84B099B82FE2D73C004C8D0F /* SoulGrid.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SoulGrid.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		84B099BB2FE2D73C004C8D0F /* SoulGridApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulGridApp.swift; sourceTree = "<group>"; };
@@ -39,18 +46,11 @@
 		84B099C92FE2DA44004C8D0F /* TelaDoPersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDoPersonagem.swift; sourceTree = "<group>"; };
 		84B099CB2FE2DBEB004C8D0F /* Personagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Personagem.swift; sourceTree = "<group>"; };
 		84B099CD2FE2E7E2004C8D0F /* Item.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Item.swift; sourceTree = "<group>"; };
-		12A7D66E993E0E518A334DD5 /* ClasseDePersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClasseDePersonagem.swift; sourceTree = "<group>"; };
-		CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inimigo.swift; sourceTree = "<group>"; };
-		0229277D8230F3680457513A /* Zona.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Zona.swift; sourceTree = "<group>"; };
 		C81688D515EA4734D89F42D2 /* GameViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameViewModel.swift; sourceTree = "<group>"; };
-		4ABAC0D431C46D3B049E70BC /* TelaCriacaoDePersonagem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaCriacaoDePersonagem.swift; sourceTree = "<group>"; };
-		4DF69EE8136F8951C5508186 /* TelaDeMasmorras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeMasmorras.swift; sourceTree = "<group>"; };
+		CACBDF999B0F579BA2BC29B9 /* Inimigo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Inimigo.swift; sourceTree = "<group>"; };
 		E8509E1EC7F1FA7723D007B6 /* TelaDeCombate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeCombate.swift; sourceTree = "<group>"; };
 		F2465FE8ABC138FB09C67610 /* Magia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Magia.swift; sourceTree = "<group>"; };
 		F92FEF1AAB079CFE1DBB87C5 /* PerfilDoJogador.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfilDoJogador.swift; sourceTree = "<group>"; };
-		3EC21B67E2A1FBF146074E96 /* TelaDeCadastro.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeCadastro.swift; sourceTree = "<group>"; };
-		1E768C29500719A658592296 /* TelaDeHerois.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeHerois.swift; sourceTree = "<group>"; };
-		73B583D626EEFB6F73069F53 /* TelaDeEquipamento.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelaDeEquipamento.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -331,6 +331,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SoulGrid/Preview Content\"";
+				DEVELOPMENT_TEAM = VFPXSCUCXD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -359,6 +360,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SoulGrid/Preview Content\"";
+				DEVELOPMENT_TEAM = VFPXSCUCXD;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
