@@ -21,7 +21,7 @@ struct TelaDaVila: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
 
-                ForEach(PNJ.catalogo) { pnj in
+                ForEach(pnjsVisiveis) { pnj in
                     pnjBox(pnj)
                 }
             }
@@ -36,6 +36,14 @@ struct TelaDaVila: View {
         } message: {
             Text(mensagem ?? "")
         }
+    }
+
+    // Só os moradores já desbloqueados pelo nível atual do herói — é isso
+    // que faz "a cada 10 níveis aparecem NPCs novos" (Oriana/Kael/Ithra,
+    // ver `PNJ.nivelMinimoParaAparecer`) valer de verdade, em vez de só
+    // mostrar as missões deles como "Bloqueada".
+    var pnjsVisiveis: [PNJ] {
+        PNJ.catalogo.filter { vm.heroi.nivel >= $0.nivelMinimoParaAparecer }
     }
 
     // Missões que fazem sentido mostrar desse PNJ para o herói atual — só

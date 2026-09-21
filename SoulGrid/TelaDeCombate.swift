@@ -224,17 +224,31 @@ struct TelaDeCombate: View {
         .cornerRadius(12)
     }
 
+    // Tamanho fixo com rolagem própria — antes crescia sem parar conforme o
+    // combate avançava, empurrando os botões de ação cada vez mais pra
+    // baixo da tela. Ordem cronológica (mais antiga no topo) com auto-scroll
+    // pra última linha a cada evento novo, como um log de chat de verdade.
     var logDeCombate: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(log.enumerated().reversed()), id: \.offset) { _, linha in
-                Text(linha).font(.caption)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(log.enumerated()), id: \.offset) { indice, linha in
+                        Text(linha).font(.caption).id(indice)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+            }
+            .background(Color.gray.opacity(0.06))
+            .cornerRadius(10)
+            .frame(height: 140)
+            .onChange(of: log.count) { _ in
+                guard let ultimoIndice = log.indices.last else { return }
+                withAnimation {
+                    proxy.scrollTo(ultimoIndice, anchor: .bottom)
+                }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.gray.opacity(0.06))
-        .cornerRadius(10)
-        .frame(minHeight: 80)
     }
 
     // MARK: - Ações
@@ -513,7 +527,7 @@ struct TelaDeCombate: View {
             inimigos = [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi)]
             iniciarNovoEncontro()
         case .descoberta:
-            let recompensa = vm.heroi.receberDescoberta(nivelZona: zona.nivelBaseInimigos)
+            let recompensa = vm.heroi.receberDescoberta(zonaNome: zona.nome, nivelZona: zona.nivelBaseInimigos)
             var texto = "Você encontrou \(recompensa.runas) Runas explorando mais fundo, sem cruzar com nenhum inimigo."
             if let item = recompensa.item {
                 texto += " Também achou: \(item.nome)!"

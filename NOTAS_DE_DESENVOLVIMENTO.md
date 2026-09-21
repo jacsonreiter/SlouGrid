@@ -845,3 +845,95 @@ só caça/chefe/nível, que cobrem a maior parte do valor com o menor
 código novo. Sem diálogo de NPC além da fala única. Válido considerar no
 futuro: uma missão recorrente/repetível pra dar o que fazer depois de
 zerar o catálogo fixo.
+
+## Missões de coleta, NPCs a cada 10 níveis, trama principal e UI (sessão seguinte)
+
+Feedback do usuário depois de jogar: gostou do combate em grupo e das
+missões, pediu pra aumentar — NPCs novos a cada 10 níveis com missões
+mais difíceis, missões de coletar item (com itens novos pra isso,
+inclusive alguns só pra vender), mais criaturas, e uma "história bem
+robusta com uma trama". Também dois problemas de UI reais: o log de
+combate crescia sem parar e empurrava os botões de ação pra baixo da
+tela, e a mochila tinha virado uma lista enorme sem organização.
+
+### UI
+
+- **`TelaDeCombate.logDeCombate`**: agora tem altura fixa (140pt) com
+  `ScrollView` própria em vez de crescer com `minHeight`. Ordem virou
+  cronológica (mais antiga no topo) com auto-scroll pra última linha a
+  cada evento novo (`ScrollViewReader` + `.onChange(of: log.count)`),
+  como um log de chat de verdade — antes era mais nova no topo, sem
+  scroll, só empurrando tudo pra baixo.
+- **`TelaDoPersonagem.mochilaBox`**: ganhou abas (Poções/Armas/
+  Armaduras/Acessórios/Materiais) com `Picker` segmentado, mesmo padrão
+  de `TelaDoMercado.AbaDoMercado`. Item de material mostra "Missão ou
+  venda" em vez de "Equipar" (não é equipável).
+
+### Novo tipo de item: Material
+
+`TipoDeItem.material` — troféu de combate que não equipa nem se "usa",
+só entrega em missão de coleta ou vende. `Item.materiaisDeZona` (8, um
+por zona, com `zonaDeOrigem` pra saber qual) e `Item.materiaisGenericos`
+(3, sem zona, sem missão nenhuma — o "item que só serve pra vender"
+pedido explicitamente). Nunca entram em `catalogoMercado`: só via drop.
+
+Drop: `Personagem.receberRecompensa` ganhou uma rolagem **separada** da
+de equipamento (20/45/70% comum/elite/chefe, metade do bônus de talismã
+de item) pro material da zona do inimigo, mais uma rolagem própria de 8%
+pra quinquilharia genérica. `receberDescoberta` (assinatura mudou, agora
+recebe `zonaNome:` também — os dois call sites em `TelaDeMasmorras` e
+`TelaDeCombate` foram atualizados) ganhou 25% de chance do material da
+zona. Nenhuma das duas rolagens compete com o loot de equipamento
+existente — são chances a mais, não substitutas.
+
+### Missões de coleta
+
+`Missao.TipoDeMissao.coletar` + campo `itemAlvo: String?` — progresso
+calculado contando quantas unidades daquele item (por nome) o herói tem
+agora (`Personagem.quantidadeDoItem`), sem contador novo persistido,
+mesmo princípio das outras missões. Entregar remove a quantidade pedida
+da mochila (`Personagem.removerQuantidade`). 8 missões de coleta novas,
+uma por zona, mesmo PNJ que já oferecia a caçada/chefe daquela zona.
+
+### NPCs novos a cada 10 níveis + trama principal ("O Selo Rompido")
+
+`PNJ` ganhou `nivelMinimoParaAparecer` — `TelaDaVila` agora filtra quais
+moradores mostrar por esse nível (`pnjsVisiveis`), não só mostra a
+missão deles como "Bloqueada". 3 NPCs novos: **Capitã Oriana** (nível
+10), **Kael, o Ferreiro** (nível 20), **Ithra, a Vidente** (nível 30) —
+cada um com uma missão de marco (`alcancarNivel`) mais 1-2 missões de
+coleta/caça de recompensa maior. Ancião Toren "retorna" no nível 40 pro
+fechamento (mesmo `pnjID`, então é literalmente o mesmo personagem —
+não precisou de PNJ novo, só de uma missão nova associada a ele).
+
+A trama ("O Selo Rompido"): a ordem de guardiões de Toren selou algo no
+Abismo Estelar há gerações; o selo está se rompendo, espalhando
+corrupção do Vazio pelas zonas — explica retroativamente por que tantos
+inimigos já se chamavam "Corrompido"/"Amaldiçoado" antes dessa trama
+existir. Contada via `Missao.loreAoEntregar` (texto de ambientação
+mostrado só nas 8 missões de marco de nível: 5/10/16/20/30/40), que
+`Personagem.entregarMissao` anexa ao texto de recompensa — sem sistema de
+diário/histórico novo, só texto acumulado na mesma mensagem que já
+existia. Fecha no nível 40 com a derrota do Devorador de Mundos (o chefe
+do Abismo Estelar, que já existia) sendo referenciada como o clímax.
+
+### Mais criaturas
+
+2 nomes novos de inimigo por zona (16 no total), metade deles temáticos
+à corrupção do Vazio (ex.: "Urso Tocado pelo Vazio", "Espectro Arcano
+Instável") — puramente variedade de nome/flavor, sem mecânica nova, zero
+risco.
+
+### Recompensas exclusivas novas
+
+7 acessórios universais exclusivos de missão (Oriana/Kael/Ithra/Toren-40),
+nenhum vendido no mercado — o "Selo do Vazio Contido" (marco de nível 40)
+é o acessório mais forte do jogo de propósito, o fechamento mecânico da
+trama.
+
+Validado só por leitura cuidadosa + balanceamento de parênteses/chaves
+via script em todos os arquivos tocados — **sem playtest real**, mesma
+ressalva de sempre. Ponto de atenção pro próximo playtest: as 3 rolagens
+de material novas (zona/quinquilharia/descoberta) nunca foram testadas
+juntas, vale sentir se materiais estão dropando rápido demais ou devagar
+demais pra completar as missões de coleta num ritmo razoável.

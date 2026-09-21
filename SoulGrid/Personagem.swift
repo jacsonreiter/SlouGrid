@@ -673,7 +673,34 @@ struct Personagem: Codable {
             return nivel >= missao.quantidadeAlvo
                 ? .prontaParaEntrega
                 : .emAndamento(atual: nivel, alvo: missao.quantidadeAlvo)
+        case .coletar:
+            guard let nomeItem = missao.itemAlvo else { return .bloqueada }
+            let atual = quantidadeDoItem(nome: nomeItem)
+            return atual >= missao.quantidadeAlvo
+                ? .prontaParaEntrega
+                : .emAndamento(atual: atual, alvo: missao.quantidadeAlvo)
         }
+    }
+
+    // Quantas unidades de um item (por nome) o herói carrega agora — usado
+    // só pra checar progresso de missões de coleta (ver `statusDaMissao`).
+    func quantidadeDoItem(nome: String) -> Int {
+        inventario.first(where: { $0.item.nome == nome })?.quantidade ?? 0
+    }
+
+    // Remove N unidades de um item (por nome) da mochila — usado ao
+    // entregar uma missão de coleta. `false` se não tinha o suficiente
+    // (não deveria acontecer, já que `entregarMissao` só chama isso depois
+    // de confirmar via `statusDaMissao`, mas fica a prova de falha).
+    @discardableResult
+    mutating func removerQuantidade(doItemNomeado nome: String, quantidade: Int) -> Bool {
+        guard let indice = inventario.firstIndex(where: { $0.item.nome == nome }),
+              inventario[indice].quantidade >= quantidade else { return false }
+        inventario[indice].quantidade -= quantidade
+        if inventario[indice].quantidade <= 0 {
+            inventario.remove(at: indice)
+        }
+        return true
     }
 
     // Entrega uma missão pronta e concede a recompensa — Runas (com os
@@ -685,6 +712,10 @@ struct Personagem: Codable {
         }
         missoesEntregues.insert(missao.id)
 
+        if missao.tipo == .coletar, let nomeItem = missao.itemAlvo {
+            removerQuantidade(doItemNomeado: nomeItem, quantidade: missao.quantidadeAlvo)
+        }
+
         var runasGanhas = missao.recompensaRunas
         if bonusOuroPercentualTotal > 0 {
             runasGanhas += runasGanhas * bonusOuroPercentualTotal / 100
@@ -695,6 +726,9 @@ struct Personagem: Codable {
         if let item = missao.recompensaItem {
             adicionarItem(item)
             texto += " Recompensa: \(item.nome)!"
+        }
+        if let lore = missao.loreAoEntregar {
+            texto += "\n\n\(lore)"
         }
         return texto
     }
@@ -722,6 +756,19 @@ struct Personagem: Codable {
             itemGanho = item
         }
 
+        // Material da zona (troféu de combate, ver `Item.materiaisDeZona`):
+        // rolagem independente do loot de equipamento acima, pra alimentar
+        // as missões de coleta sem competir pela mesma chance de item.
+        let chanceDeMaterial = min(100, (inimigo.chefe ? 70 : (inimigo.elite ? 45 : 20)) + bonusChanceDeItemTotal / 2)
+        if Int.random(in: 1...100) <= chanceDeMaterial, let material = Item.materialDaZona(inimigo.zonaOrigem) {
+            adicionarItem(material)
+        }
+        // Quinquilharia genérica: chance pequena e independente, sem zona
+        // nenhuma — só pra vender (ver `Item.materiaisGenericos`).
+        if Int.random(in: 1...100) <= 8, let quinquilharia = Item.materiaisGenericos.randomElement() {
+            adicionarItem(quinquilharia)
+        }
+
         var novaRunica: String? = nil
         if inimigo.chefe && !runicasConquistadas.contains(inimigo.zonaOrigem) {
             runicasConquistadas.insert(inimigo.zonaOrigem)
@@ -735,7 +782,7 @@ struct Personagem: Codable {
     // Um achado pacífico durante a exploração — um cadáver caído, um baú
     // escondido — sem combate, estilo os itens espalhados pelo mapa aberto
     // de Elden Ring. Recompensa menor que vencer um inimigo, mas de graça.
-    mutating func receberDescoberta(nivelZona: Int) -> (runas: Int, item: Item?) {
+    mutating func receberDescoberta(zonaNome: String, nivelZona: Int) -> (runas: Int, item: Item?) {
         var runasGanhas = Int.random(in: (4 + nivelZona)...(9 + nivelZona * 2))
         let bonusPercentual = bonusOuroPercentualTotal + bonusDeSequenciaPercentual
         if bonusPercentual > 0 {
@@ -750,6 +797,10 @@ struct Personagem: Codable {
             let item = Item.lootAleatorio(nivelInimigo: nivelZona, bonusRaridade: bonusRaridadeDeItemTotal, classe: classe)
             adicionarItem(item)
             itemGanho = item
+        }
+
+        if Int.random(in: 1...100) <= 25, let material = Item.materialDaZona(zonaNome) {
+            adicionarItem(material)
         }
         return (runasGanhas, itemGanho)
     }
@@ -881,7 +932,7 @@ struct Personagem: Codable {
             recalcularMaximos()
             return "Você equipou \(item.nome) no talismã \(indiceVazio + 1)! \(item.bonus.descricaoCurta)."
 
-        case .pocao:
+        case .pocao, .material:
             return "Esse item não pode ser equipado."
         }
     }
@@ -903,7 +954,7 @@ struct Personagem: Codable {
             return "Você guardou \(item.nome) na mochila."
         case .acessorio:
             return "Use removerAcessorio(doSlot:) para talismãs."
-        case .pocao:
+        case .pocao, .material:
             return "Isso não é um equipamento."
         }
     }

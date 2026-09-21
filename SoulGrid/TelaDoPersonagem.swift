@@ -4,6 +4,7 @@ struct TelaDoPersonagem: View {
     @EnvironmentObject var vm: GameViewModel
     @State private var mensagem = "Bem-vindo(a) de volta, aventureiro(a)!"
     @State private var slotSelecionado: Int? = nil
+    @State private var abaMochila: AbaDaMochila = .pocoes
 
     var body: some View {
         ScrollView {
@@ -279,17 +280,52 @@ struct TelaDoPersonagem: View {
             .cornerRadius(12)
     }
 
+    // Abas por tipo — antes a mochila listava tudo junto numa lista só,
+    // que ficava enorme depois de algumas horas de jogo. Mesmo padrão de
+    // `TelaDoMercado.AbaDoMercado`.
+    enum AbaDaMochila: String, CaseIterable {
+        case pocoes = "Poções"
+        case armas = "Armas"
+        case armaduras = "Armaduras"
+        case acessorios = "Acessórios"
+        case materiais = "Materiais"
+    }
+
+    var itensDaAbaMochila: [PilhaDeItens] {
+        vm.heroi.inventario.filter { pilha in
+            switch abaMochila {
+            case .pocoes: return pilha.item.tipo == .pocao
+            case .armas: return pilha.item.tipo == .arma
+            case .armaduras: return pilha.item.tipo == .armadura
+            case .acessorios: return pilha.item.tipo == .acessorio
+            case .materiais: return pilha.item.tipo == .material
+            }
+        }
+    }
+
     var mochilaBox: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Mochila")
                 .font(.title2)
                 .fontWeight(.bold)
 
+            Picker("Aba", selection: $abaMochila) {
+                ForEach(AbaDaMochila.allCases, id: \.self) { aba in
+                    Text(aba.rawValue).tag(aba)
+                }
+            }
+            .pickerStyle(.segmented)
+
             if vm.heroi.inventario.isEmpty {
                 Text("Vazia")
                     .foregroundColor(.secondary)
+            } else if itensDaAbaMochila.isEmpty {
+                Text("Nada nessa aba ainda.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
             } else {
-                ForEach(vm.heroi.inventario) { pilha in
+                ForEach(itensDaAbaMochila) { pilha in
                     linhaDaMochila(pilha)
                 }
             }
@@ -337,6 +373,12 @@ struct TelaDoPersonagem: View {
                     }
                     .foregroundColor(.green)
                 }
+            } else if pilha.item.tipo == .material {
+                // Material de missão/comércio: não equipa nem se "usa",
+                // só entrega em missões (na Vila) ou vende aqui.
+                Text("Missão ou venda")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             } else {
                 Button("Equipar") {
                     mensagem = vm.heroi.equiparItem(pilha)

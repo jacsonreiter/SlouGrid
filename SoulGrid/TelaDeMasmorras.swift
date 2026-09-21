@@ -100,7 +100,7 @@ struct TelaDeMasmorras: View {
             eliteParaExplorar = true
             navegandoParaExploracao = true
         case .descoberta:
-            let recompensa = vm.heroi.receberDescoberta(nivelZona: zona.nivelBaseInimigos)
+            let recompensa = vm.heroi.receberDescoberta(zonaNome: zona.nome, nivelZona: zona.nivelBaseInimigos)
             var texto = "Você encontrou \(recompensa.runas) Runas explorando \(zona.nome), sem cruzar com nenhum inimigo."
             if let item = recompensa.item {
                 texto += " Também achou: \(item.nome)!"

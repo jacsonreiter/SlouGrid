@@ -6,6 +6,12 @@ enum TipoDeItem: String, Codable {
     case arma
     case armadura
     case acessorio
+    // Material: troféu de combate que não equipa nem se "usa" — só serve
+    // pra entregar em missões de coleta (ver `Missao.TipoDeMissao.coletar`)
+    // ou vender por Runas. Alguns são específicos de uma zona (dropam só
+    // lá, usados nas missões daquela zona); outros são "quinquilharia"
+    // genérica sem uso em missão nenhuma, só pra vender mesmo.
+    case material
 }
 
 enum EfeitoDePocao: String, Codable {
@@ -153,6 +159,10 @@ struct Item: Codable, Identifiable {
     // combate — `TelaDoPersonagem` esconde o botão "Usar" desse tipo de
     // poção na mochila fora de combate, pra não desperdiçar o item à toa.
     var efeitoDeBuffTemporario: Magia? = nil
+    // Só relevante para `tipo == .material`: a zona onde esse material
+    // dropa (ver `Item.materialDaZona`). `nil` = material "genérico", sem
+    // zona nenhuma — só serve pra vender (ver `Item.materiaisGenericos`).
+    var zonaDeOrigem: String? = nil
 
     // Um acessório conta como talismã (efeito passivo, estilo Elden Ring)
     // se mexer em qualquer um dos campos de efeito de talismã — os
@@ -180,13 +190,18 @@ struct Item: Codable, Identifiable {
             }
         case .arma, .armadura, .acessorio:
             return bonus.descricaoCurta
+        case .material:
+            return zonaDeOrigem != nil
+                ? "Material raro — entregue em missões de coleta ou venda por Runas."
+                : "Quinquilharia sem uso — só serve pra vender por Runas."
         }
     }
 
     init(nome: String, tipo: TipoDeItem, valor: Int, preco: Int, raridade: Raridade = .comum,
          classeRestrita: ClasseDePersonagem? = nil, efeitoDePocao: EfeitoDePocao? = nil,
          nivelMinimo: Int = 1, bonus: BonusDeAtributos = BonusDeAtributos(),
-         habilidadeDeArma: Magia? = nil, efeitoDeBuffTemporario: Magia? = nil) {
+         habilidadeDeArma: Magia? = nil, efeitoDeBuffTemporario: Magia? = nil,
+         zonaDeOrigem: String? = nil) {
         self.nome = nome
         self.tipo = tipo
         self.valor = valor
@@ -198,6 +213,7 @@ struct Item: Codable, Identifiable {
         self.bonus = bonus
         self.habilidadeDeArma = habilidadeDeArma
         self.efeitoDeBuffTemporario = efeitoDeBuffTemporario
+        self.zonaDeOrigem = zonaDeOrigem
     }
 
     // Decodificação tolerante: itens salvos antes do sistema de bônus por
@@ -223,10 +239,11 @@ struct Item: Codable, Identifiable {
             case .arma: bonus = BonusDeAtributos(forca: valor)
             case .armadura: bonus = BonusDeAtributos(defesa: valor)
             case .acessorio: bonus = BonusDeAtributos(energia: valor)
-            case .pocao: bonus = BonusDeAtributos()
+            case .pocao, .material: bonus = BonusDeAtributos()
             }
         }
 
+        zonaDeOrigem = try c.decodeIfPresent(String.self, forKey: .zonaDeOrigem)
         habilidadeDeArma = try c.decodeIfPresent(Magia.self, forKey: .habilidadeDeArma) ?? nil
         efeitoDeBuffTemporario = try c.decodeIfPresent(Magia.self, forKey: .efeitoDeBuffTemporario) ?? nil
     }
@@ -476,5 +493,35 @@ extension Item {
             $0.raridade == ordem[indice] && ($0.classeRestrita == nil || $0.classeRestrita == classe)
         }
         return pool.randomElement() ?? catalogoMercado[0]
+    }
+
+    // MARK: - Materiais (troféus de combate)
+
+    // Um material por zona — usado nas missões de coleta daquela zona (ver
+    // `Missao.catalogo`) e sempre vendável. Preço sobe com a faixa da
+    // zona, como o resto do loot. Nunca entram em `catalogoMercado`: só se
+    // consegue dropando, nunca comprando.
+    static let materiaisDeZona: [Item] = [
+        Item(nome: "Pelo de Lobo Selvagem", tipo: .material, valor: 0, preco: 15, raridade: .comum, zonaDeOrigem: "Floresta Sombria"),
+        Item(nome: "Glândula de Sapo Venenoso", tipo: .material, valor: 0, preco: 15, raridade: .comum, zonaDeOrigem: "Pântano Nebuloso"),
+        Item(nome: "Fragmento de Cristal Bruto", tipo: .material, valor: 0, preco: 25, raridade: .incomum, zonaDeOrigem: "Cavernas de Pedra"),
+        Item(nome: "Osso Gélido Amaldiçoado", tipo: .material, valor: 0, preco: 25, raridade: .incomum, zonaDeOrigem: "Necrópole Congelada"),
+        Item(nome: "Fragmento de Runa Antiga", tipo: .material, valor: 0, preco: 40, raridade: .raro, zonaDeOrigem: "Ruínas Antigas"),
+        Item(nome: "Emblema do Renegado", tipo: .material, valor: 0, preco: 40, raridade: .raro, zonaDeOrigem: "Fortaleza Abandonada"),
+        Item(nome: "Pó Arcano Instável", tipo: .material, valor: 0, preco: 65, raridade: .epico, zonaDeOrigem: "Torre do Feiticeiro"),
+        Item(nome: "Fragmento do Vazio", tipo: .material, valor: 0, preco: 65, raridade: .epico, zonaDeOrigem: "Abismo Estelar")
+    ]
+
+    // Quinquilharia sem zona nenhuma — dropa em qualquer lugar (chance
+    // separada e pequena, ver `Personagem.receberRecompensa`), nenhuma
+    // missão pede, só serve pra vender.
+    static let materiaisGenericos: [Item] = [
+        Item(nome: "Moeda Antiga Enferrujada", tipo: .material, valor: 0, preco: 12, raridade: .comum),
+        Item(nome: "Relíquia Quebrada", tipo: .material, valor: 0, preco: 18, raridade: .comum),
+        Item(nome: "Pedra Bruta Sem Valor", tipo: .material, valor: 0, preco: 8, raridade: .comum)
+    ]
+
+    static func materialDaZona(_ zona: String) -> Item? {
+        materiaisDeZona.first { $0.zonaDeOrigem == zona }
     }
 }
