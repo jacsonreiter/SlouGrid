@@ -640,6 +640,26 @@ struct TelaDeCombate: View {
         return max(0, inimigos[indice].defesa * (100 - queimadura.reducaoDefesa) / 100)
     }
 
+    // Resistência/fraqueza elemental da zona (ver `Zona.resistenciasDaZona`,
+    // `Magia.elemento`), aplicada por cima da mitigação de Defesa como um
+    // modificador final — positivo reduz o dano, negativo amplifica. Teto
+    // dos dois lados (nunca reduz a quase nada nem amplifica sem limite),
+    // pra escolher a build certa importar sem tornar a errada inútil.
+    private func aplicarResistencia(_ dano: Int, elemento: ElementoDeDano, doAlvo indice: Int) -> Int {
+        let resistencia = inimigos[indice].resistencias[elemento] ?? 0
+        let multiplicador = max(0.4, min(1.5, 1.0 - Double(resistencia) / 100.0))
+        return max(1, Int(Double(dano) * multiplicador))
+    }
+
+    // Feedback textual pra o jogador aprender o perfil elemental do lugar
+    // jogando, sem precisar de um painel de resistências explícito.
+    private func textoDeResistencia(elemento: ElementoDeDano, doAlvo indice: Int) -> String {
+        let resistencia = inimigos[indice].resistencias[elemento] ?? 0
+        if resistencia >= 25 { return " O ataque foi parcialmente resistido." }
+        if resistencia <= -15 { return " Fraqueza explorada!" }
+        return ""
+    }
+
     // Limpa todo efeito temporário (veneno, atordoamento, sangramento,
     // calafrio, queimadura) de um alvo — chamado sempre que ele morre, pra
     // um efeito que ainda estava acumulando/ativo não "vazar" pro próximo
@@ -659,6 +679,7 @@ struct TelaDeCombate: View {
             turnoDosInimigos()
             return
         }
+        vm.heroi.ganharMaestriaComArmaEquipada()
         let resultado = vm.heroi.calcularDanoBasico(bonusForca: bonusForcaTemporario)
         aplicarDanoBasicoAoAlvo(resultado.dano, critico: resultado.critico)
     }
@@ -667,12 +688,14 @@ struct TelaDeCombate: View {
     // como a Defesa do herói já funciona em `Personagem.sofrerDano`.
     private func aplicarDanoBasicoAoAlvo(_ danoBruto: Int, critico: Bool) {
         let indice = indiceAlvo
-        let danoFinal = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
+        let danoAposDefesa = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
+        let danoFinal = aplicarResistencia(danoAposDefesa, elemento: .fisico, doAlvo: indice)
         inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoFinal)
         let nomeAlvo = inimigos[indice].nome
-        log.append(critico
+        log.append((critico
             ? "Você acertou um golpe crítico! -\(danoFinal) de vida no \(nomeAlvo)."
             : "Você atacou o \(nomeAlvo) causando \(danoFinal) de dano.")
+            + textoDeResistencia(elemento: .fisico, doAlvo: indice))
         UIImpactFeedbackGenerator(style: critico ? .heavy : .medium).impactOccurred()
 
         if !inimigos[indice].estaVivo {
@@ -732,17 +755,23 @@ struct TelaDeCombate: View {
         case .agilidade: atributoBruto = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
         }
         let atributoBase = Int(Personagem.valorEfetivoDeDano(atributoBruto))
-        let danoBruto = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
+        vm.heroi.ganharMaestriaComArmaEquipada()
+        let danoBrutoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
+        let danoBruto = danoBrutoBase + danoBrutoBase * vm.heroi.bonusDeMaestriaPercentual / 100
 
         let indice = indiceAlvo
         // Mesma mitigação de Defesa do ataque básico (ver
         // `aplicarDanoBasicoAoAlvo`) — o veneno/dano por turno logo abaixo
         // fica de fora de propósito, como o sangramento/veneno de Elden
-        // Ring, que ignora a armadura.
-        let danoFinal = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
+        // Ring, que ignora a armadura. Depois da Defesa, a resistência
+        // elemental da zona (ver `aplicarResistencia`) entra como
+        // modificador final — a mesma magia bate diferente dependendo de
+        // onde é usada.
+        let danoAposDefesa = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
+        let danoFinal = aplicarResistencia(danoAposDefesa, elemento: magia.elemento, doAlvo: indice)
         inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoFinal)
         let nomeAlvo = inimigos[indice].nome
-        var texto = "Você usou \(magia.nome) e causou \(danoFinal) de dano em \(nomeAlvo)!"
+        var texto = "Você usou \(magia.nome) e causou \(danoFinal) de dano em \(nomeAlvo)!\(textoDeResistencia(elemento: magia.elemento, doAlvo: indice))"
 
         var alvoAindaVivo = inimigos[indice].estaVivo
         if alvoAindaVivo && magia.tipo == .danoComEfeito {
@@ -764,7 +793,8 @@ struct TelaDeCombate: View {
             let acumulo = magia.acumuloDeStatus ?? 25
             let totalAcumulado = (sangramentoPorAlvo[indice] ?? 0) + acumulo
             if totalAcumulado >= limiarDeSangramento {
-                let explosao = max(1, Int(Double(inimigos[indice].vidaMaxima) * percentualExplosaoSangramento))
+                let explosaoBruta = max(1, Int(Double(inimigos[indice].vidaMaxima) * percentualExplosaoSangramento))
+                let explosao = aplicarResistencia(explosaoBruta, elemento: .fisico, doAlvo: indice)
                 inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - explosao)
                 sangramentoPorAlvo[indice] = nil
                 texto += " O sangramento de \(nomeAlvo) explode, causando \(explosao) de dano!"
@@ -938,8 +968,9 @@ struct TelaDeCombate: View {
                 venenoPorAlvo[indice] = nil
                 continue
             }
-            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - ativo.dano)
-            log.append("O veneno causa \(ativo.dano) de dano em \(inimigos[indice].nome).")
+            let danoDoVeneno = aplicarResistencia(ativo.dano, elemento: .veneno, doAlvo: indice)
+            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoDoVeneno)
+            log.append("O veneno causa \(danoDoVeneno) de dano em \(inimigos[indice].nome).")
             if !inimigos[indice].estaVivo {
                 log.append("\(inimigos[indice].nome) sucumbiu ao veneno!")
                 limparEfeitosDoAlvo(indice)
@@ -953,8 +984,9 @@ struct TelaDeCombate: View {
                 queimaduraPorAlvo[indice] = nil
                 continue
             }
-            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - ativa.dano)
-            log.append("A queimadura causa \(ativa.dano) de dano em \(inimigos[indice].nome).")
+            let danoDaQueimadura = aplicarResistencia(ativa.dano, elemento: .fogo, doAlvo: indice)
+            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoDaQueimadura)
+            log.append("A queimadura causa \(danoDaQueimadura) de dano em \(inimigos[indice].nome).")
             if !inimigos[indice].estaVivo {
                 log.append("\(inimigos[indice].nome) sucumbiu às chamas!")
                 limparEfeitosDoAlvo(indice)

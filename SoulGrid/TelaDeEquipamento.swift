@@ -136,7 +136,8 @@ struct TelaDeEquipamento: View {
         let bonusEquipamento = vm.heroi.totalDe(atributo) - base
         let pendente = alocacoes[atributo] ?? 0
         let totalComPendente = base + pendente + bonusEquipamento
-        let podeAlocarMais = vm.heroi.ouro >= vm.heroi.custoTotal(pontosPendentes: totalDePontosAlocados + 1)
+        let podeAlocarMais = base + pendente < Personagem.atributoMaximo
+            && vm.heroi.ouro >= vm.heroi.custoTotal(pontosPendentes: totalDePontosAlocados + 1)
 
         return HStack {
             Label(atributo.rawValue, systemImage: icone)
@@ -276,6 +277,14 @@ struct TelaDeEquipamento: View {
                             Label("\(habilidade.nome) (\(habilidade.custoEnergia) EN)", systemImage: habilidade.icone)
                                 .font(.caption)
                                 .foregroundColor(.indigo)
+                        }
+                        // Maestria (estilo Melvor Idle): sobe golpe a golpe
+                        // com essa arma equipada, nunca reseta ao trocar de
+                        // arma e voltar — recompensa dominar uma build.
+                        if tipo == .arma {
+                            Label("Maestria nível \(vm.heroi.nivelDeMaestriaArmaAtual)/\(Personagem.nivelMaximoDeMaestria) (+\(vm.heroi.bonusDeMaestriaPercentual)% dano)", systemImage: "star.fill")
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
                         }
                     }
                     Spacer()

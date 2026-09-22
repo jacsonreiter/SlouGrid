@@ -98,6 +98,14 @@ struct Personagem: Codable {
     // nível, e é fiel ao próprio jogo em que o projeto se inspira.
     var cicloNewGamePlus: Int = 0
 
+    // Maestria de Arma (estilo Mastery de Melvor Idle): nome da arma →
+    // quantos golpes já foram acertados com ela equipada, ao longo de toda
+    // a carreira do herói. Puramente aditivo — nunca esquece, nunca reseta
+    // ao trocar de arma e voltar — então dominar uma build específica vira
+    // uma recompensa de longo prazo por si só, sem depender de sorte de
+    // loot nem custar Runas (ver `nivelDeMaestriaArmaAtual`).
+    var maestriaDeArmas: [String: Int] = [:]
+
     static let numeroDeSlotsDeMagia = 3
     static let numeroDeSlotsDeAcessorio = 3
     // Limites do Frasco Sagrado: sem teto, Sementes/Lágrimas compradas ou
@@ -107,6 +115,13 @@ struct Personagem: Codable {
     // combate.
     static let cargasDeFrascoMaximo = 12
     static let potenciaDoFrascoMaxima = 100
+    // Teto de cada um dos 6 atributos, estilo Elden Ring (Vigor/Mente/
+    // Fortitude/Força/Destreza/Inteligência/Fé/Arcano todos vão até 99, nunca
+    // mais) — sem isso, Runas o bastante deixavam um atributo crescer pra
+    // sempre, o que não é "build", é só "quem farmou mais". Com o teto, a
+    // decisão de build vira genuinamente ONDE investir os pontos, não SE dá
+    // pra continuar empilhando um atributo só.
+    static let atributoMaximo = 99
 
     init(nome: String, classe: ClasseDePersonagem) {
         self.id = UUID()
@@ -148,7 +163,7 @@ struct Personagem: Codable {
              cargasDeFrascoTotal, frascosDeVidaAlocados, frascosDeEnergiaAlocados,
              frascosDeVidaAtuais, frascosDeEnergiaAtuais, potenciaDoFrasco,
              runicasConquistadas, runicaSelecionada, runicaEquipadaAtiva,
-             sequenciaDeExploracao, missoesEntregues, cicloNewGamePlus
+             sequenciaDeExploracao, missoesEntregues, cicloNewGamePlus, maestriaDeArmas
         case acessorioEquipadoLegado = "acessorioEquipado"
         case nivelLegado = "nivel"
     }
@@ -221,6 +236,7 @@ struct Personagem: Codable {
         sequenciaDeExploracao = try c.decodeIfPresent(Int.self, forKey: .sequenciaDeExploracao) ?? 0
         missoesEntregues = try c.decodeIfPresent(Set<String>.self, forKey: .missoesEntregues) ?? []
         cicloNewGamePlus = try c.decodeIfPresent(Int.self, forKey: .cicloNewGamePlus) ?? 0
+        maestriaDeArmas = try c.decodeIfPresent([String: Int].self, forKey: .maestriaDeArmas) ?? [:]
     }
 
     // Escrito à mão porque o `CodingKeys` tem chaves extras
@@ -262,6 +278,7 @@ struct Personagem: Codable {
         try c.encode(sequenciaDeExploracao, forKey: .sequenciaDeExploracao)
         try c.encode(missoesEntregues, forKey: .missoesEntregues)
         try c.encode(cicloNewGamePlus, forKey: .cicloNewGamePlus)
+        try c.encode(maestriaDeArmas, forKey: .maestriaDeArmas)
     }
 
     var estaVivo: Bool {
@@ -494,6 +511,11 @@ struct Personagem: Codable {
         guard totalDePontos > 0 else {
             return "Nenhum ponto alocado ainda."
         }
+        for (atributo, pontos) in alocacoes where pontos > 0 {
+            guard valor(de: atributo) + pontos <= Personagem.atributoMaximo else {
+                return "\(atributo.rawValue) não pode passar de \(Personagem.atributoMaximo)."
+            }
+        }
         let custo = custoTotal(pontosPendentes: totalDePontos)
         guard ouro >= custo else {
             return "Runas insuficientes! Confirmar essa evolução custaria \(custo) Runas."
@@ -620,11 +642,52 @@ struct Personagem: Codable {
         return ateSegundoPatamar + Double(bruto - segundoPatamar) * 0.2
     }
 
+    // MARK: - Maestria de Arma
+
+    static let nivelMaximoDeMaestria = 20
+
+    // Curva de XP pra cada nível de maestria: custo por nível cresce
+    // linearmente (15, 30, 45, ...), então dominar uma arma pede dedicação
+    // real (centenas de golpes até o topo), não algumas dúzias de acertos.
+    static func nivelDeMaestria(xp: Int) -> Int {
+        var nivel = 0
+        var custoAcumulado = 0
+        while nivel < Personagem.nivelMaximoDeMaestria {
+            custoAcumulado += (nivel + 1) * 15
+            if xp < custoAcumulado { break }
+            nivel += 1
+        }
+        return nivel
+    }
+
+    // Nível de maestria da arma EQUIPADA agora — 0 se nenhuma arma
+    // equipada, já que maestria é sobre dominar uma arma específica, não um
+    // bônus geral do personagem.
+    var nivelDeMaestriaArmaAtual: Int {
+        guard let nome = armaEquipada?.nome else { return 0 }
+        return Personagem.nivelDeMaestria(xp: maestriaDeArmas[nome] ?? 0)
+    }
+
+    // +1% de dano por nível de maestria (até +20% no nível 20) — pura
+    // recompensa por USAR a mesma arma golpe após golpe, estilo o sistema
+    // de Mastery de Melvor Idle: a build que o jogador domina fica mais
+    // forte com o tempo, sem depender de Runas nem de sorte de loot.
+    var bonusDeMaestriaPercentual: Int { nivelDeMaestriaArmaAtual }
+
+    // Chamado a cada golpe que acerta (ataque básico, Golpe de Arma ou
+    // magia do grimório) enquanto uma arma está equipada — nunca esquece,
+    // nunca reseta ao trocar de arma e voltar depois.
+    mutating func ganharMaestriaComArmaEquipada() {
+        guard let nome = armaEquipada?.nome else { return }
+        maestriaDeArmas[nome, default: 0] += 1
+    }
+
     // Ataque básico: sempre disponível, com chance de crítico.
     // `bonusForca` inclui fortalecimentos temporários ativos só durante o combate.
     func calcularDanoBasico(bonusForca: Int = 0) -> (dano: Int, critico: Bool) {
         let forcaEfetiva = Personagem.valorEfetivoDeDano(forcaTotal + bonusForca)
         var dano = Int(forcaEfetiva) + Int.random(in: -2...4)
+        dano += dano * bonusDeMaestriaPercentual / 100
         let critico = Int.random(in: 1...100) <= chanceDeCriticoBasico
         if critico { dano = Int(Double(dano) * 1.8) }
         return (max(1, dano), critico)

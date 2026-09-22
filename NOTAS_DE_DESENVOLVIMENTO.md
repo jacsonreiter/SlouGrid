@@ -1232,3 +1232,65 @@ sessão foi verificada com números de verdade antes de subir, não só
 "parece razoável"). Ainda **sem playtest real no dispositivo** — o
 próximo teste do usuário é o que vai validar se os alvos de "2-3
 acertos" acertaram a mão ou precisam de mais um ajuste.
+
+## Teto de atributos, resistência elemental por zona e Maestria de Arma (mesma sessão)
+
+Depois de ver o build automático de um mago no Elden Ring de verdade
+(print de tela do menu de nível: 8 atributos travados em 99, poder de
+ataque/defesa por tipo de dano, tudo se somando numa build), o usuário
+pediu pra estudar mais fundo Elden Ring E também **Melvor Idle** (jogo
+de RPG idle da App Store, que ele jogou bastante) — a essência pedida:
+"o player testar combinações, criar builds, e explorar as mecânicas",
+com batalhas difíceis que precisam ser conquistadas.
+
+Pesquisei os dois jogos e trouxe uma fatia concreta e bem-testada de
+cada um, em vez de tentar portar os dois sistemas inteiros:
+
+- **Teto de atributos em 99** ([soft caps do Elden Ring](https://eldenring.wiki.fextralife.com/Stats)):
+  `Personagem.atributoMaximo = 99`. `confirmarEvolucao` recusa qualquer
+  alocação que estourasse o teto num atributo (mensagem clara, nada é
+  gasto), e o botão "+" de cada atributo em `TelaDeEquipamento` já
+  desabilita ao chegar em 99. Sem isso, Runas o bastante deixavam um
+  atributo crescer pra sempre — não era build, era só quem farmou mais.
+- **Resistência/fraqueza elemental por zona** (o "Poder de defesa" por
+  tipo de dano do menu do Elden Ring, adaptado): `Magia.elemento`
+  (computado, nunca salvo, deriva de `tipo`/`atributoDeEscala` —
+  Queimadura=fogo, Calafrio=gelo, Sangramento/dano-por-Força=físico,
+  dano-por-Inteligência=arcano, Veneno=veneno) + `Inimigo.resistencias`
+  + `Zona.resistenciasDaZona(_:)`, um perfil por zona (ex.: Necrópole
+  Congelada resiste gelo e é fraca a fogo; Cavernas de Pedra resiste
+  físico e é fraca a arcano). `TelaDeCombate` aplica o modificador (teto
+  0.4x-1.5x) depois da mitigação de Defesa, em todo dano — básico,
+  magia, explosão de Sangramento, DoT de Veneno/Queimadura — e avisa no
+  log ("resistido"/"fraqueza explorada!") sem um painel explícito, pra
+  o jogador aprender jogando. Isso é o que torna as builds construídas
+  nas sessões anteriores (fogo/gelo/sangramento/veneno) taticamente
+  relevantes de verdade: a masmorra certa recompensa a build certa.
+- **Maestria de Arma** (Mastery de Melvor Idle): `Personagem.
+  maestriaDeArmas: [String:Int]` conta golpes acertados por nome de
+  arma, pra sempre — nunca reseta ao trocar de arma e voltar depois.
+  `nivelDeMaestria(xp:)` sobe até 20, custo crescente por nível
+  (15/30/45/...), concedendo +1% de dano por nível (até +20%) enquanto
+  aquela arma está equipada. Puramente aditivo, sem custar Runas nem
+  depender de sorte de loot — recompensa dominar uma build só de tanto
+  usá-la, e é visível no slot de arma em `TelaDeEquipamento`.
+
+Escopo deliberadamente menor que "portar os dois jogos inteiros":
+Melvor Idle tem 9 skills de combate + triângulo Melee/Ranged/Magic +
+mastery pool por skill inteira, e Elden Ring separa a resistência em
+Físico/Esmagador/Cortante/Perfurante além de Mágico/Fogo/Relâmpago/
+Sagrado. Adaptar tudo isso de uma vez faria mais sentido com playtest
+real intercalado — por ora, entrou o que dava pra calibrar com confiança
+e que mais diretamente atende "testar combinações, explorar mecânicas,
+batalhas conquistadas" sem reescrever o combate inteiro de novo.
+
+Validado por balanceamento de chaves/parênteses + auditoria de ordem de
+argumentos em todos os arquivos (incluindo o `Inimigo` novo na lista).
+`ElementoDeDano` é um enum simples sem valor associado — Hashable/
+Equatable sintetizados automaticamente pelo Swift, então funciona como
+chave de dicionário (`Inimigo.resistencias`) sem conformidade explícita.
+Sem playtest real de novo — próximo teste do usuário valida se o teto
+elemental (0.4x-1.5x) e a curva de maestria (15 golpes pro nível 1, 3150
+no total pro nível 20 — deliberadamente uma meta de fim de jogo de longo
+prazo, no espírito dos próprios níveis de Mastery de Melvor Idle, não
+algo pra bater numa campanha normal) estão na medida certa.

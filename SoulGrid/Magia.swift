@@ -30,6 +30,21 @@ enum AtributoDeEscala: String, Codable {
     case agilidade
 }
 
+// O "tipo de dano" de Elden Ring (Físico/Mágico/Fogo/Relâmpago/Sagrado),
+// adaptado pro jogo: cada zona tem um perfil de resistência/fraqueza (ver
+// `Zona.resistenciasDaZona`), então a MESMA build bate diferente dependendo
+// de onde é usada — escolher a build certa pra cada masmorra vira uma
+// decisão tática de verdade, não só estética. Derivado direto do `tipo`/
+// `atributoDeEscala` da magia (nunca um campo salvo) — não muda a forma
+// como `Magia` é persistida dentro de `Item.habilidadeDeArma`.
+enum ElementoDeDano: String {
+    case fisico
+    case fogo
+    case gelo
+    case veneno
+    case arcano
+}
+
 // `Codable` porque, além do grimório da classe (nunca persistido, sempre
 // recriado em código), uma `Magia` agora também pode viver dentro de um
 // `Item` como o "Golpe de Arma" da arma (ver `Item.habilidadeDeArma`) — e
@@ -63,6 +78,21 @@ struct Magia: Identifiable, Codable {
     // salvo não tivesse esse campo ainda.
     var acumuloDeStatus: Int? = nil              // Sangramento/Calafrio: quanto esse golpe soma ao acúmulo
     var reducaoDeDefesaPercentual: Int? = nil    // Queimadura: % de Defesa a menos no alvo enquanto ativa
+
+    // Elemento pra fins de resistência/fraqueza (ver `ElementoDeDano`):
+    // sempre derivado de `tipo`/`atributoDeEscala`, nunca guardado — cada
+    // status novo já "nasce" com elemento certo sem precisar migrar nada.
+    var elemento: ElementoDeDano {
+        switch tipo {
+        case .queimadura: return .fogo
+        case .calafrio: return .gelo
+        case .danoComEfeito: return .veneno
+        case .sangramento: return .fisico
+        case .dano, .atordoante:
+            return atributoDeEscala == .inteligencia ? .arcano : .fisico
+        case .cura, .fortalecimento: return .fisico
+        }
+    }
 }
 
 extension ClasseDePersonagem {

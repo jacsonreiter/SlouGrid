@@ -34,6 +34,27 @@ struct Zona: Identifiable {
         1.0 + Double(ciclo) * 0.35
     }
 
+    // Perfil elemental de cada zona (ver `ElementoDeDano`/`Magia.elemento`):
+    // positivo = resiste (dano reduzido), negativo = fraqueza (dano
+    // aumentado). Estilo os "Poder de defesa" por tipo do Elden Ring —
+    // adaptado pra que CADA zona recompense uma build diferente (fogo
+    // contra o pântano venenoso e a necrópole congelada; físico contra
+    // magia arcana entalhada na pedra; arcano contra armadura pesada),
+    // tornando "qual build eu levo pra essa masmorra" uma decisão real.
+    static func resistenciasDaZona(_ nome: String) -> [ElementoDeDano: Int] {
+        switch nome {
+        case "Floresta Sombria": return [.fisico: 15, .fogo: -20]
+        case "Pântano Nebuloso": return [.veneno: 40, .fogo: -20]
+        case "Cavernas de Pedra": return [.fisico: 25, .arcano: -20]
+        case "Necrópole Congelada": return [.gelo: 35, .fogo: -25]
+        case "Ruínas Antigas": return [.arcano: 30, .fisico: -15]
+        case "Fortaleza Abandonada": return [.fisico: 25, .arcano: -15]
+        case "Torre do Feiticeiro": return [.arcano: 25, .gelo: 15, .veneno: -20]
+        case "Abismo Estelar": return [.arcano: 25, .gelo: 20, .fogo: -25]
+        default: return [:]
+        }
+    }
+
     // Rebalanceado depois de um playtest real mostrar que o jogo estava
     // trivial de verdade: uma Bola de Fogo de nível 1 (sem cajado nenhum)
     // fazia ~36 de dano contra um inimigo comum de nível 1 com só 35 de
@@ -70,7 +91,8 @@ struct Zona: Identifiable {
             xpRecompensa: Int(Double(20 + nivel * 10) * multiplicador),
             ouroRecompensa: Int(Double(9 + nivel * 4) * multiplicador)...Int(Double(17 + nivel * 7) * multiplicador),
             chefe: false,
-            zonaOrigem: nome
+            zonaOrigem: nome,
+            resistencias: Zona.resistenciasDaZona(nome)
         )
     }
 
@@ -92,7 +114,12 @@ struct Zona: Identifiable {
             xpRecompensa: Int(Double(170 + nivel * 20) * multiplicador),
             ouroRecompensa: Int(Double(85 + nivel * 12) * multiplicador)...Int(Double(150 + nivel * 16) * multiplicador),
             chefe: true,
-            zonaOrigem: nome
+            zonaOrigem: nome,
+            // Metade da magnitude do resto da zona: o chefe ainda tem a
+            // identidade elemental do lugar, mas sem travar a luta atrás de
+            // uma build específica — isso é papel do inimigo comum, que o
+            // jogador enfrenta várias vezes antes de aprender o padrão.
+            resistencias: Zona.resistenciasDaZona(nome).mapValues { $0 / 2 }
         )
     }
 
