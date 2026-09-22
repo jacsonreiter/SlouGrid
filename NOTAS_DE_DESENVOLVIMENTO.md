@@ -1294,3 +1294,35 @@ elemental (0.4x-1.5x) e a curva de maestria (15 golpes pro nível 1, 3150
 no total pro nível 20 — deliberadamente uma meta de fim de jogo de longo
 prazo, no espírito dos próprios níveis de Mastery de Melvor Idle, não
 algo pra bater numa campanha normal) estão na medida certa.
+
+## Custo de Runas cúbico após o teto de 99 (mesma sessão, correção rápida)
+
+Levantei o teto de atributos em 99 na entrega anterior sem mexer no
+custo em Runas de cada ponto (`custoEmRunas`, que era só linear no
+total de pontos comprados). O usuário pegou o problema na hora,
+perguntando se eu realmente entendia como o nível/Runas escala em Elden
+Ring: lá, chegar em 99 em TUDO é nível 713 e custa **1,69 bilhão de
+Runas no total** — a curva é cúbica, e é isso que torna "tudo maxado"
+uma meta de fim de jogo real, não um objetivo natural de qualquer
+personagem. Sem uma curva equivalente aqui, o teto de 99 sozinho não
+bastava: com o custo antigo, maxar os 6 atributos custava só ~308 mil
+Runas no total — um fim de semana de grind, não uma conquista de
+verdade. E como o "nível" deste jogo é só `1 + pontosComprados/5`, sem
+uma curva que realmente pese, o personagem ficaria "fraco" no sentido
+de que qualquer build convergiria pro mesmo estado final maxado cedo
+demais, matando a escolha de build que todo o resto desta sessão
+construiu.
+
+Fórmula nova, mesma forma da curva real de Elden Ring (suave nos
+primeiros níveis, explode depois): `custoBase` continua idêntico até
+`Personagem.limiarDeEscaladaDeCusto = 300` pontos comprados (nível 61,
+bem depois do fim d'"O Selo Final" no nível 40 — **a trama principal
+não fica um centavo mais cara**), e a partir daí soma uma sobretaxa
+cúbica sobre o excedente (`excedente³ / 900`). Resultado calibrado por
+simulação em Python: nível 40 continua custando ~40 mil Runas
+(igual a antes), nível 90 já custa ~345 mil acumulados, e maxar os 6
+atributos em 99 (nível 111) passa a custar **~1,4 milhão de Runas no
+total** — não 1,69 bilhão como no jogo original (a economia deste jogo
+é bem menor em escala absoluta), mas a MESMA relação: barato pra jogar
+a campanha normal, uma fortuna desproporcional pra chegar no hard cap
+de verdade.

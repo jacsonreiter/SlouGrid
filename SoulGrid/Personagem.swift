@@ -441,6 +441,12 @@ struct Personagem: Codable {
         energiaMaximaBase = novaEnergiaMaximaBase
     }
 
+    // A partir de qual total de pontos comprados o custo de Runas passa a
+    // escalar em cubo (ver `custoEmRunas`) — 300 pontos = nível 61, bem
+    // depois do fim d'"O Selo Final" (nível 40). Tudo abaixo disso é jogo
+    // normal e não muda em nada.
+    static let limiarDeEscaladaDeCusto = 300
+
     // Custo em Runas do próximo ponto — estilo Elden Ring de verdade: o
     // preço depende de quantos pontos você já tem NO TOTAL (ou seja, do seu
     // nível), nunca de qual atributo está sendo melhorado. Custa exatamente
@@ -449,8 +455,25 @@ struct Personagem: Codable {
     // escolha de onde investir é só sobre a build, nunca sobre "qual tá mais
     // barato agora" (esse soft cap por atributo existia antes; não existe
     // mais, de propósito).
+    //
+    // A curva real de Runas de Elden Ring é cúbica (nível 1→713 custa 1,69
+    // bilhão de Runas no total, sendo suave até uns 70-80 níveis e só
+    // "explodindo" depois disso — é por isso que chegar em 99 em TUDO
+    // custa uma fortuna desproporcional, apesar de cada atributo isolado
+    // não parecer tão alto). Sem isso, o teto de 99 por atributo (ver
+    // `atributoMaximo`) virava alcançável cedo demais, e "personagem com
+    // tudo no máximo" deixava de ser uma escolha de build rara pra virar
+    // só o estado final óbvio de qualquer um. Replicamos a MESMA forma:
+    // linear (sem mudar em nada) até `limiarDeEscaladaDeCusto`, cúbica daí
+    // pra frente — chegar no nível 40 da trama principal continua custando
+    // exatamente o mesmo de antes; chegar nos 99 em tudo (nível 111) passa
+    // a custar ~1,4 milhão de Runas no total, uma meta de NG+ avançado.
     static func custoEmRunas(pontosTotaisComprados: Int) -> Int {
-        (1 + pontosTotaisComprados / 10) * 20
+        let custoBase = (1 + pontosTotaisComprados / 10) * 20
+        guard pontosTotaisComprados > limiarDeEscaladaDeCusto else { return custoBase }
+        let excedente = pontosTotaisComprados - limiarDeEscaladaDeCusto
+        let sobretaxaCubica = (excedente * excedente * excedente) / 900
+        return custoBase + sobretaxaCubica
     }
 
     // Custo do próximo ponto considerando pontos já alocados nesta sessão de
