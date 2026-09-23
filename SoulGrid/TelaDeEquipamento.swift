@@ -23,6 +23,7 @@ struct TelaDeEquipamento: View {
         ScrollView {
             VStack(spacing: 20) {
                 atributosBox
+                poderDoPersonagemBox
 
                 slotBox(titulo: "Arma", icone: "bolt.fill", item: vm.heroi.armaEquipada, tipo: .arma)
                 slotBox(titulo: "Armadura", icone: "shield.fill", item: vm.heroi.armaduraEquipada, tipo: .armadura)
@@ -122,6 +123,92 @@ struct TelaDeEquipamento: View {
         .padding()
         .background(Color.gray.opacity(0.12))
         .cornerRadius(12)
+    }
+
+    // MARK: - Poder do Personagem (estilo o menu de status do Elden Ring:
+    // Poder Base/Poder de Ataque/Poder de Defesa)
+
+    // Três blocos separados — Poder Base (vida/recurso), Poder de Ataque
+    // (dano físico + cada elemento + crítico/acúmulo) e Poder de Defesa
+    // (defesa física + o preço dos talismãs de troca) — pra deixar claro
+    // exatamente o que cada arma/armadura/talismã equipado está somando
+    // no personagem, sem precisar adivinhar olhando pilha de descrições
+    // separadas em cada slot.
+    var poderDoPersonagemBox: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Poder do Personagem")
+                .font(.headline)
+            Text("O efeito real de cada arma, armadura e talismã equipado, tudo somado.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            poderBox(titulo: "Poder Base", icone: "person.fill", cor: .blue) {
+                linhaDePoder("Vida Máxima", vm.heroi.vidaMaxima)
+                linhaDePoder("\(vm.heroi.classe.nomeDoRecurso) Máximo", vm.heroi.energiaMaximaTotal)
+            }
+
+            poderBox(titulo: "Poder de Ataque", icone: "bolt.fill", cor: .red) {
+                linhaDePoderPercentual("Dano Físico", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .fisico))
+                linhaDePoderPercentual("Dano de Fogo", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .fogo))
+                linhaDePoderPercentual("Dano de Gelo", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .gelo))
+                linhaDePoderPercentual("Dano de Veneno", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .veneno))
+                linhaDePoderPercentual("Dano Arcano", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .arcano))
+                linhaDePoderPercentual("Potência de Magia (todo elemento)", vm.heroi.bonusPotenciaDeMagiaPercentualTotal)
+                linhaDePoderPercentual("Maestria da Arma Atual", vm.heroi.bonusDeMaestriaPercentual)
+                linhaDePoderPercentual("Dano Crítico", vm.heroi.bonusDanoCriticoPercentualTotal)
+                linhaDePoderPercentual("Acúmulo de Sangramento/Calafrio", vm.heroi.bonusAcumuloDeStatusPercentualTotal)
+            }
+
+            poderBox(titulo: "Poder de Defesa", icone: "shield.fill", cor: .cyan) {
+                linhaDePoder("Defesa Física", vm.heroi.defesaTotal)
+                if vm.heroi.reducaoDeDefesaPropriaPercentualTotal > 0 {
+                    linhaDePoderPercentual("Redução por Talismã de Troca", -vm.heroi.reducaoDeDefesaPropriaPercentualTotal)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.gray.opacity(0.12))
+        .cornerRadius(12)
+    }
+
+    @ViewBuilder
+    func poderBox<Conteudo: View>(titulo: String, icone: String, cor: Color, @ViewBuilder conteudo: () -> Conteudo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(titulo, systemImage: icone)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(cor)
+            conteudo()
+        }
+        .padding(10)
+        .background(cor.opacity(0.08))
+        .cornerRadius(10)
+    }
+
+    func linhaDePoder(_ titulo: String, _ valor: Int) -> some View {
+        HStack {
+            Text(titulo).font(.caption).foregroundColor(.secondary)
+            Spacer()
+            Text("\(valor)").font(.caption).fontWeight(.semibold)
+        }
+    }
+
+    // Some linhas de % só aparecem quando diferentes de zero, pra não
+    // poluir a tela com uma fileira de "+0%" — só os efeitos que algum
+    // equipamento realmente está dando.
+    @ViewBuilder
+    func linhaDePoderPercentual(_ titulo: String, _ valor: Int) -> some View {
+        if valor != 0 {
+            HStack {
+                Text(titulo).font(.caption).foregroundColor(.secondary)
+                Spacer()
+                Text("\(valor > 0 ? "+" : "")\(valor)%")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(valor > 0 ? .green : .red)
+            }
+        }
     }
 
     private func iconeDoAtributo(_ atributo: AtributoPrimario) -> (String, Color) {

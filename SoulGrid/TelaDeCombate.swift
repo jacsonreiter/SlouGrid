@@ -757,7 +757,14 @@ struct TelaDeCombate: View {
         let atributoBase = Int(Personagem.valorEfetivoDeDano(atributoBruto))
         vm.heroi.ganharMaestriaComArmaEquipada()
         let danoBrutoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
-        let danoBruto = danoBrutoBase + danoBrutoBase * vm.heroi.bonusDeMaestriaPercentual / 100
+        // Maestria + talismã do elemento específico da magia + Potência de
+        // Magia (genérico, soma em qualquer magia — nunca no ataque
+        // básico, que não passa por aqui) — os três somam direto no dano
+        // bruto, antes de Defesa/resistência.
+        let bonusPercentual = vm.heroi.bonusDeMaestriaPercentual
+            + vm.heroi.bonusDeDanoPercentualTotal(paraElemento: magia.elemento)
+            + vm.heroi.bonusPotenciaDeMagiaPercentualTotal
+        let danoBruto = danoBrutoBase + danoBrutoBase * bonusPercentual / 100
 
         let indice = indiceAlvo
         // Mesma mitigação de Defesa do ataque básico (ver
@@ -775,7 +782,8 @@ struct TelaDeCombate: View {
 
         var alvoAindaVivo = inimigos[indice].estaVivo
         if alvoAindaVivo && magia.tipo == .danoComEfeito {
-            let danoPorTurno = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let danoPorTurnoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let danoPorTurno = danoPorTurnoBase + danoPorTurnoBase * bonusPercentual / 100
             venenoPorAlvo[indice] = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos)
             texto += " \(nomeAlvo) está envenenado."
         } else if alvoAindaVivo && magia.tipo == .atordoante {
@@ -790,7 +798,8 @@ struct TelaDeCombate: View {
                 texto += " \(nomeAlvo) ficou atordoado!"
             }
         } else if alvoAindaVivo && magia.tipo == .sangramento {
-            let acumulo = magia.acumuloDeStatus ?? 25
+            let acumuloBase = magia.acumuloDeStatus ?? 25
+            let acumulo = acumuloBase + acumuloBase * vm.heroi.bonusAcumuloDeStatusPercentualTotal / 100
             let totalAcumulado = (sangramentoPorAlvo[indice] ?? 0) + acumulo
             if totalAcumulado >= limiarDeSangramento {
                 let explosaoBruta = max(1, Int(Double(inimigos[indice].vidaMaxima) * percentualExplosaoSangramento))
@@ -803,7 +812,8 @@ struct TelaDeCombate: View {
                 texto += " Sangramento se acumula em \(nomeAlvo) (\(totalAcumulado)/\(limiarDeSangramento))."
             }
         } else if alvoAindaVivo && magia.tipo == .calafrio {
-            let acumulo = magia.acumuloDeStatus ?? 25
+            let acumuloBase = magia.acumuloDeStatus ?? 25
+            let acumulo = acumuloBase + acumuloBase * vm.heroi.bonusAcumuloDeStatusPercentualTotal / 100
             let totalAcumulado = (calafrioPorAlvo[indice] ?? 0) + acumulo
             if totalAcumulado >= limiarDeCalafrio {
                 calafrioPorAlvo[indice] = nil
@@ -820,7 +830,8 @@ struct TelaDeCombate: View {
                 texto += " Calafrio se acumula em \(nomeAlvo) (\(totalAcumulado)/\(limiarDeCalafrio))."
             }
         } else if alvoAindaVivo && magia.tipo == .queimadura {
-            let danoPorTurno = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let danoPorTurnoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let danoPorTurno = danoPorTurnoBase + danoPorTurnoBase * bonusPercentual / 100
             let reducao = magia.reducaoDeDefesaPercentual ?? 15
             queimaduraPorAlvo[indice] = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos, reducaoDefesa: reducao)
             texto += " \(nomeAlvo) está queimando, com a defesa reduzida em \(reducao)%."

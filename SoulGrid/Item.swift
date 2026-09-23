@@ -75,11 +75,37 @@ struct BonusDeAtributos: Codable, Equatable {
     var bonusChanceDeItemPercentual: Int = 0
     var bonusRaridadeDeItem: Int = 0
 
+    // Talismãs de combate estilo Elden Ring (Flamedrake/Spelldrake pro
+    // "negação" que este jogo não tem por elemento ainda; Fire/Magic
+    // Scorpion Charm pro padrão de troca "+dano de elemento, -defesa
+    // própria"; Rotten Winged Sword Insignia pro bônus de crítico). Cada
+    // um soma dano de UM elemento específico (ver `ElementoDeDano` em
+    // `Magia.swift`) — `bonusPotenciaDeMagiaPercentual` é a exceção, um
+    // bônus genérico que soma em cima de QUALQUER magia, de qualquer
+    // elemento, estilo os talismãs de "poder de feitiço" que não são
+    // específicos de escola. `reducaoDeDefesaPropriaPercentual` é o preço
+    // dos talismãs de troca — sem ele, "mais dano, menos defesa" não
+    // seria possível de representar.
+    var bonusDanoFisicoPercentual: Int = 0
+    var bonusDanoFogoPercentual: Int = 0
+    var bonusDanoGeloPercentual: Int = 0
+    var bonusDanoVenenoPercentual: Int = 0
+    var bonusDanoArcanoPercentual: Int = 0
+    var bonusPotenciaDeMagiaPercentual: Int = 0
+    var bonusDanoCriticoPercentual: Int = 0
+    var bonusAcumuloDeStatusPercentual: Int = 0
+    var reducaoDeDefesaPropriaPercentual: Int = 0
+
     init(forca: Int = 0, vitalidade: Int = 0, inteligencia: Int = 0, destreza: Int = 0,
          agilidade: Int = 0, sorte: Int = 0, defesa: Int = 0, energia: Int = 0,
          regenVidaPorTurno: Int = 0, regenEnergiaPorTurno: Int = 0,
          bonusOuroPercentual: Int = 0, bonusChanceDeItemPercentual: Int = 0,
-         bonusRaridadeDeItem: Int = 0) {
+         bonusRaridadeDeItem: Int = 0,
+         bonusDanoFisicoPercentual: Int = 0, bonusDanoFogoPercentual: Int = 0,
+         bonusDanoGeloPercentual: Int = 0, bonusDanoVenenoPercentual: Int = 0,
+         bonusDanoArcanoPercentual: Int = 0, bonusPotenciaDeMagiaPercentual: Int = 0,
+         bonusDanoCriticoPercentual: Int = 0, bonusAcumuloDeStatusPercentual: Int = 0,
+         reducaoDeDefesaPropriaPercentual: Int = 0) {
         self.forca = forca
         self.vitalidade = vitalidade
         self.inteligencia = inteligencia
@@ -93,11 +119,21 @@ struct BonusDeAtributos: Codable, Equatable {
         self.bonusOuroPercentual = bonusOuroPercentual
         self.bonusChanceDeItemPercentual = bonusChanceDeItemPercentual
         self.bonusRaridadeDeItem = bonusRaridadeDeItem
+        self.bonusDanoFisicoPercentual = bonusDanoFisicoPercentual
+        self.bonusDanoFogoPercentual = bonusDanoFogoPercentual
+        self.bonusDanoGeloPercentual = bonusDanoGeloPercentual
+        self.bonusDanoVenenoPercentual = bonusDanoVenenoPercentual
+        self.bonusDanoArcanoPercentual = bonusDanoArcanoPercentual
+        self.bonusPotenciaDeMagiaPercentual = bonusPotenciaDeMagiaPercentual
+        self.bonusDanoCriticoPercentual = bonusDanoCriticoPercentual
+        self.bonusAcumuloDeStatusPercentual = bonusAcumuloDeStatusPercentual
+        self.reducaoDeDefesaPropriaPercentual = reducaoDeDefesaPropriaPercentual
     }
 
-    // Decodificação tolerante: saves antigos têm um `bonus` só com os 8
-    // campos originais. Sem isso, decodificar essa struct aninhada quebraria
-    // o save inteiro assim que um dos 5 campos novos não fosse encontrado.
+    // Decodificação tolerante: saves antigos têm um `bonus` só com os
+    // campos que existiam na época. Sem isso, decodificar essa struct
+    // aninhada quebraria o save inteiro assim que um campo novo não fosse
+    // encontrado.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         forca = try c.decodeIfPresent(Int.self, forKey: .forca) ?? 0
@@ -113,6 +149,15 @@ struct BonusDeAtributos: Codable, Equatable {
         bonusOuroPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusOuroPercentual) ?? 0
         bonusChanceDeItemPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusChanceDeItemPercentual) ?? 0
         bonusRaridadeDeItem = try c.decodeIfPresent(Int.self, forKey: .bonusRaridadeDeItem) ?? 0
+        bonusDanoFisicoPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusDanoFisicoPercentual) ?? 0
+        bonusDanoFogoPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusDanoFogoPercentual) ?? 0
+        bonusDanoGeloPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusDanoGeloPercentual) ?? 0
+        bonusDanoVenenoPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusDanoVenenoPercentual) ?? 0
+        bonusDanoArcanoPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusDanoArcanoPercentual) ?? 0
+        bonusPotenciaDeMagiaPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusPotenciaDeMagiaPercentual) ?? 0
+        bonusDanoCriticoPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusDanoCriticoPercentual) ?? 0
+        bonusAcumuloDeStatusPercentual = try c.decodeIfPresent(Int.self, forKey: .bonusAcumuloDeStatusPercentual) ?? 0
+        reducaoDeDefesaPropriaPercentual = try c.decodeIfPresent(Int.self, forKey: .reducaoDeDefesaPropriaPercentual) ?? 0
     }
 
     var descricaoCurta: String {
@@ -130,6 +175,15 @@ struct BonusDeAtributos: Codable, Equatable {
         if bonusOuroPercentual != 0 { partes.append("+\(bonusOuroPercentual)% Runas") }
         if bonusChanceDeItemPercentual != 0 { partes.append("+\(bonusChanceDeItemPercentual)% Chance de Item") }
         if bonusRaridadeDeItem != 0 { partes.append("+\(bonusRaridadeDeItem) Sorte de Raridade") }
+        if bonusDanoFisicoPercentual != 0 { partes.append("+\(bonusDanoFisicoPercentual)% Dano Físico") }
+        if bonusDanoFogoPercentual != 0 { partes.append("+\(bonusDanoFogoPercentual)% Dano de Fogo") }
+        if bonusDanoGeloPercentual != 0 { partes.append("+\(bonusDanoGeloPercentual)% Dano de Gelo") }
+        if bonusDanoVenenoPercentual != 0 { partes.append("+\(bonusDanoVenenoPercentual)% Dano de Veneno") }
+        if bonusDanoArcanoPercentual != 0 { partes.append("+\(bonusDanoArcanoPercentual)% Dano Arcano") }
+        if bonusPotenciaDeMagiaPercentual != 0 { partes.append("+\(bonusPotenciaDeMagiaPercentual)% Potência de Magia") }
+        if bonusDanoCriticoPercentual != 0 { partes.append("+\(bonusDanoCriticoPercentual)% Dano Crítico") }
+        if bonusAcumuloDeStatusPercentual != 0 { partes.append("+\(bonusAcumuloDeStatusPercentual)% Acúmulo de Status") }
+        if reducaoDeDefesaPropriaPercentual != 0 { partes.append("-\(reducaoDeDefesaPropriaPercentual)% Defesa Própria") }
         return partes.joined(separator: ", ")
     }
 }
@@ -178,6 +232,11 @@ struct Item: Codable, Identifiable {
         bonus.regenVidaPorTurno != 0 || bonus.regenEnergiaPorTurno != 0
             || bonus.bonusOuroPercentual != 0 || bonus.bonusChanceDeItemPercentual != 0
             || bonus.bonusRaridadeDeItem != 0
+            || bonus.bonusDanoFisicoPercentual != 0 || bonus.bonusDanoFogoPercentual != 0
+            || bonus.bonusDanoGeloPercentual != 0 || bonus.bonusDanoVenenoPercentual != 0
+            || bonus.bonusDanoArcanoPercentual != 0 || bonus.bonusPotenciaDeMagiaPercentual != 0
+            || bonus.bonusDanoCriticoPercentual != 0 || bonus.bonusAcumuloDeStatusPercentual != 0
+            || bonus.reducaoDeDefesaPropriaPercentual != 0
     }
 
     // Estilo Elden Ring: armas normais evoluem até +25 (Pedras de Ferreiro,
@@ -547,7 +606,30 @@ extension Item {
         Item(nome: "Relicário da Raridade", tipo: .acessorio, valor: 0, preco: 450, raridade: .raro, nivelMinimo: 13, bonus: BonusDeAtributos(bonusRaridadeDeItem: 1)),
         Item(nome: "Coração da Fênix", tipo: .acessorio, valor: 0, preco: 600, raridade: .epico, nivelMinimo: 16, bonus: BonusDeAtributos(vitalidade: 4, regenVidaPorTurno: 6)),
         Item(nome: "Poço sem Fundo", tipo: .acessorio, valor: 0, preco: 600, raridade: .epico, nivelMinimo: 16, bonus: BonusDeAtributos(inteligencia: 4, regenEnergiaPorTurno: 6)),
-        Item(nome: "Grande Escaravelho Ancestral", tipo: .acessorio, valor: 0, preco: 800, raridade: .epico, nivelMinimo: 19, bonus: BonusDeAtributos(bonusOuroPercentual: 20, bonusChanceDeItemPercentual: 20, bonusRaridadeDeItem: 1))
+        Item(nome: "Grande Escaravelho Ancestral", tipo: .acessorio, valor: 0, preco: 800, raridade: .epico, nivelMinimo: 19, bonus: BonusDeAtributos(bonusOuroPercentual: 20, bonusChanceDeItemPercentual: 20, bonusRaridadeDeItem: 1)),
+
+        // Talismãs de combate — estilo Fire/Magic Scorpion Charm de Elden
+        // Ring: cada um soma dano de UM elemento (ver `ElementoDeDano` em
+        // `Magia.swift`) em troca de reduzir a própria Defesa. É a mesma
+        // tensão de build dos talismãs de troca do jogo original — mais
+        // dano de fogo custa ficar mais vulnerável a tudo, não só a fogo,
+        // já que a Defesa deste jogo ainda não separa por tipo recebido.
+        Item(nome: "Bracelete das Chamas", tipo: .acessorio, valor: 0, preco: 340, raridade: .raro, nivelMinimo: 8, bonus: BonusDeAtributos(bonusDanoFogoPercentual: 14, reducaoDeDefesaPropriaPercentual: 10)),
+        Item(nome: "Amuleto Glacial", tipo: .acessorio, valor: 0, preco: 340, raridade: .raro, nivelMinimo: 8, bonus: BonusDeAtributos(bonusDanoGeloPercentual: 14, reducaoDeDefesaPropriaPercentual: 10)),
+        Item(nome: "Anel do Veneno Mortal", tipo: .acessorio, valor: 0, preco: 340, raridade: .raro, nivelMinimo: 8, bonus: BonusDeAtributos(bonusDanoVenenoPercentual: 14, reducaoDeDefesaPropriaPercentual: 10)),
+        Item(nome: "Selo Arcano Sombrio", tipo: .acessorio, valor: 0, preco: 340, raridade: .raro, nivelMinimo: 8, bonus: BonusDeAtributos(bonusDanoArcanoPercentual: 14, reducaoDeDefesaPropriaPercentual: 10)),
+        Item(nome: "Talismã do Punho de Ferro", tipo: .acessorio, valor: 0, preco: 300, raridade: .raro, nivelMinimo: 7, bonus: BonusDeAtributos(bonusDanoFisicoPercentual: 12, reducaoDeDefesaPropriaPercentual: 8)),
+
+        // Talismãs de combate sem troca — mais caros/tardios de propósito,
+        // já que não custam Defesa nenhuma (estilo Rakshasa Set, que soma
+        // dano sem reduzir nada).
+        Item(nome: "Grimório Amplificado", tipo: .acessorio, valor: 0, preco: 620, raridade: .epico, nivelMinimo: 14, bonus: BonusDeAtributos(bonusPotenciaDeMagiaPercentual: 15)),
+        Item(nome: "Cristal Prismático", tipo: .acessorio, valor: 0, preco: 700, raridade: .epico, nivelMinimo: 17, bonus: BonusDeAtributos(bonusDanoFogoPercentual: 6, bonusDanoGeloPercentual: 6, bonusDanoVenenoPercentual: 6, bonusDanoArcanoPercentual: 6)),
+        // Rotten Winged Sword Insignia: crítico bate mais forte.
+        Item(nome: "Insígnia da Fera Ferida", tipo: .acessorio, valor: 0, preco: 420, raridade: .raro, nivelMinimo: 10, bonus: BonusDeAtributos(bonusDanoCriticoPercentual: 18)),
+        // Sinergia direta com as builds de Sangramento/Calafrio: acumula
+        // status muito mais rápido, explodindo/atordoando em menos golpes.
+        Item(nome: "Talismã do Carrasco Sangrento", tipo: .acessorio, valor: 0, preco: 420, raridade: .raro, nivelMinimo: 10, bonus: BonusDeAtributos(bonusAcumuloDeStatusPercentual: 20))
     ]
 
     // Itens vendidos no mercado para uma classe: poções e acessórios (universais)

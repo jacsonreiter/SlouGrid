@@ -1454,3 +1454,75 @@ quando o nível chega. Confirmado por leitura de `statusDaMissao`: o
 gate de nível já era por missão, nunca dependeu do PNJ estar visível —
 então essa era a única mudança necessária, sem risco de destravar as
 missões de Kael cedo demais.
+
+## Talismãs de combate estilo Elden Ring + tela de Poder Base/Ataque/Defesa (mesma sessão)
+
+Pedido: pesquisar os talismãs/armaduras reais de Elden Ring (dano
+mágico, dano de fogo com troca de negação, potência de feitiço, etc.)
+pra trazer variedade real de build, e construir a tela de status
+"Poder Base/Poder de Ataque/Poder de Defesa" do menu de nível do jogo,
+pra o jogador ver o efeito exato de cada peça equipada.
+
+### Pesquisa
+
+Confirmei o padrão real dos talismãs de troca — **Fire Scorpion
+Charm**: +12% dano de Fogo, +10% dano físico recebido; **Magic
+Scorpion Charm**: mesma coisa pra Mágico. E o padrão sem troca —
+**Flamedrake/Spelldrake**: só negação de dano por elemento, sem custo;
+**Rakshasa Set**: +2% de dano por peça, sem reduzir nada. Também
+confirmei que armadura completa não dá bônus de conjunto em Elden Ring
+(pode misturar peças livremente) — não precisei construir lógica de
+"set bonus" nenhuma.
+
+### O que entrou
+
+- **9 campos novos em `BonusDeAtributos`**: `bonusDanoFisicoPercentual`,
+  `bonusDanoFogoPercentual`, `bonusDanoGeloPercentual`,
+  `bonusDanoVenenoPercentual`, `bonusDanoArcanoPercentual` (um por
+  `ElementoDeDano`, o sistema de elemento já construído nesta sessão pro
+  sistema de resistência de zona), `bonusPotenciaDeMagiaPercentual`
+  (genérico, soma em QUALQUER magia independente do elemento — os
+  talismãs de "poder de feitiço" que não são de uma escola só),
+  `bonusDanoCriticoPercentual`, `bonusAcumuloDeStatusPercentual`
+  (sinergia direta com Sangramento/Calafrio) e
+  `reducaoDeDefesaPropriaPercentual` (o preço dos talismãs de troca).
+- **9 talismãs novos** no catálogo: 5 de troca (`Bracelete das Chamas`,
+  `Amuleto Glacial`, `Anel do Veneno Mortal`, `Selo Arcano Sombrio`,
+  `Talismã do Punho de Ferro` — todos +dano de um elemento / -defesa
+  própria) e 4 sem troca, mais caros/tardios (`Grimório Amplificado` —
+  potência de magia pura; `Cristal Prismático` — um pouco de todo
+  elemento de dano; `Insígnia da Fera Ferida` — dano crítico;
+  `Talismã do Carrasco Sangrento` — acúmulo de status).
+- **Aplicado no combate de verdade**: `TelaDeCombate.lancarMagia` soma
+  o bônus do elemento específico da magia (`magia.elemento`) + Potência
+  de Magia no dano principal E no dano por turno de
+  Veneno/Queimadura; `Personagem.calcularDanoBasico` soma o bônus
+  físico + crítico no ataque básico; o acúmulo de Sangramento/Calafrio
+  também escala com `bonusAcumuloDeStatusPercentualTotal`.
+  `reducaoDeDefesaPropriaPercentualTotal` (capado em 80%, nunca zera a
+  Defesa de vez) entra em `Personagem.sofrerDano` como redução da
+  Defesa efetiva contra TUDO, não só contra o elemento reforçado — o
+  mesmo trade-off do Fire/Magic Scorpion Charm real.
+- **`TelaDeEquipamento.poderDoPersonagemBox`**: nova seção com os 3
+  blocos do menu de nível de Elden Ring — Poder Base (Vida/recurso da
+  classe), Poder de Ataque (dano físico + cada elemento + Potência de
+  Magia + Maestria + Crítico + Acúmulo de Status, cada linha só aparece
+  se algum equipamento estiver dando aquele bônus) e Poder de Defesa
+  (Defesa Física + a redução dos talismãs de troca, se houver).
+
+### Escopo deixado de fora, de propósito
+
+Não implementei resistência elemental RECEBIDA pelo jogador (Fogo/
+Gelo/Veneno/Arcano no "Poder de Defesa"), porque os inimigos deste jogo
+ainda só causam dano físico — uma resistência que nunca é testada
+contra nada seria decorativa, não real. O sistema de resistência de
+zona já construído nesta sessão é só do lado do jogador ATACANDO; dar
+aos inimigos ataques elementais próprios (pra "Poder de Defesa"
+elemental fazer sentido de verdade) fica como próximo passo natural,
+não deste round.
+
+Validado por balanceamento de chaves/parênteses + auditoria de ordem
+de argumentos (agora com os 9 campos novos de `BonusDeAtributos` no
+canon do script) em todos os arquivos, sem regressão. Sem playtest
+real — o próximo teste valida se os números dos talismãs (14%/-10% nos
+de troca, 15-20% nos sem troca) estão nivelados certos.

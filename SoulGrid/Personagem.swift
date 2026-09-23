@@ -361,6 +361,42 @@ struct Personagem: Codable {
         bonusAtivos.reduce(0) { $0 + $1.bonusRaridadeDeItem } + sorteTotal / 40
     }
 
+    // MARK: - Bônus de combate (talismãs de dano/crítico/acúmulo, ver `Item.swift`)
+
+    // Só o bônus ESPECÍFICO daquele elemento — Potência de Magia
+    // (`bonusPotenciaDeMagiaPercentualTotal`, abaixo) é somada à parte por
+    // quem calcula dano de verdade (`TelaDeCombate.lancarMagia`), nunca
+    // embutida aqui, pra a tela de Poder de Ataque poder mostrar as duas
+    // linhas separadas sem contar a mesma coisa duas vezes.
+    func bonusDeDanoPercentualTotal(paraElemento elemento: ElementoDeDano) -> Int {
+        switch elemento {
+        case .fisico: return bonusAtivos.reduce(0) { $0 + $1.bonusDanoFisicoPercentual }
+        case .fogo: return bonusAtivos.reduce(0) { $0 + $1.bonusDanoFogoPercentual }
+        case .gelo: return bonusAtivos.reduce(0) { $0 + $1.bonusDanoGeloPercentual }
+        case .veneno: return bonusAtivos.reduce(0) { $0 + $1.bonusDanoVenenoPercentual }
+        case .arcano: return bonusAtivos.reduce(0) { $0 + $1.bonusDanoArcanoPercentual }
+        }
+    }
+
+    var bonusPotenciaDeMagiaPercentualTotal: Int {
+        bonusAtivos.reduce(0) { $0 + $1.bonusPotenciaDeMagiaPercentual }
+    }
+
+    var bonusDanoCriticoPercentualTotal: Int {
+        bonusAtivos.reduce(0) { $0 + $1.bonusDanoCriticoPercentual }
+    }
+
+    var bonusAcumuloDeStatusPercentualTotal: Int {
+        bonusAtivos.reduce(0) { $0 + $1.bonusAcumuloDeStatusPercentual }
+    }
+
+    // Preço dos talismãs de troca (ver `Item.reducaoDeDefesaPropriaPercentual`)
+    // — reduz a própria Defesa em vez de aumentá-la, então fica limitado a
+    // no máximo 80%: nunca zera de vez, só fica bem mais vulnerável.
+    var reducaoDeDefesaPropriaPercentualTotal: Int {
+        min(80, bonusAtivos.reduce(0) { $0 + $1.reducaoDeDefesaPropriaPercentual })
+    }
+
     // Bônus concedido pela Grande Rúnica atualmente ativa (vazio se nenhuma
     // estiver ativa, ou enquanto uma nova selecionada aguarda descanso).
     var bonusDeRunicaAtiva: BonusDeAtributos {
@@ -751,8 +787,9 @@ struct Personagem: Codable {
         let forcaEfetiva = Personagem.valorEfetivoDeDano(forcaTotal + bonusForca)
         var dano = Int(forcaEfetiva) + Int.random(in: -2...4)
         dano += dano * bonusDeMaestriaPercentual / 100
+        dano += dano * bonusDeDanoPercentualTotal(paraElemento: .fisico) / 100
         let critico = Int.random(in: 1...100) <= chanceDeCriticoBasico
-        if critico { dano = Int(Double(dano) * 1.8) }
+        if critico { dano = Int(Double(dano) * (1.8 + Double(bonusDanoCriticoPercentualTotal) / 100)) }
         return (max(1, dano), critico)
     }
 
@@ -763,7 +800,12 @@ struct Personagem: Codable {
         if Int.random(in: 1...100) <= chanceDeEsquiva {
             return (0, true)
         }
-        var dano = forcaInimigo - (defesaTotal + bonusDefesa) + Int.random(in: -2...3)
+        // Talismãs de troca (ver `reducaoDeDefesaPropriaPercentualTotal`)
+        // cobram o preço bem aqui: mais dano de elemento em troca de uma
+        // Defesa efetiva menor contra TUDO, não só contra o elemento que
+        // o talismã reforça.
+        let defesaEfetiva = Int(Double(defesaTotal + bonusDefesa) * (1.0 - Double(reducaoDeDefesaPropriaPercentualTotal) / 100.0))
+        var dano = forcaInimigo - defesaEfetiva + Int.random(in: -2...3)
         dano = max(1, dano)
         dano = max(1, Int(Double(dano) * (1 - classe.reducaoDeDanoPercentual)))
         vidaAtual = max(0, vidaAtual - dano)
