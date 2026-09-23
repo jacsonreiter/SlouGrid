@@ -1364,3 +1364,74 @@ ficou pra trás na tela antiga depois da mudança. Sem playtest real —
 próximo teste do usuário valida se a pontuação de comparação bate com
 a intuição dele (ela ignora Golpe de Arma/efeito de buff de propósito,
 que são subjetivos demais pra virar seta).
+
+## Destreza e Sorte deixam de saturar cedo + auditoria de harmonia entre as 3 classes (mesma sessão)
+
+O usuário perguntou se Destreza e Sorte escalavam tão bem quanto
+Inteligência pro Mago. Resposta: não. `chanceDeAcerto` (Destreza) tinha
+um teto absoluto de 98% batido com só **26 pontos** — qualquer coisa
+acima virava 100% desperdiçada. `chanceDeCriticoBasico` (Sorte) tinha
+teto de 60% batido com **~55 pontos**. Comparado com Inteligência (soft
+cap 40/70, nunca satura de vez, ainda escala Mana), isso quebrava o
+propósito inteiro do sistema de custo cúbico até o 99 (ver a entrada
+"Custo de Runas cúbico" acima) — sem retorno nenhum depois de 26/55,
+ninguém investiria Runas ali de propósito, então "maxar em 99" só fazia
+sentido pro atributo de dano principal de cada classe.
+
+Pedido explícito: consertar E verificar as 3 classes, não só o caso do
+Mago.
+
+### O que mudou
+
+- **`Personagem.valorEfetivoDeChance(_:primeiroPatamar:segundoPatamar:)`**:
+  a mesma filosofia de soft cap de `valorEfetivoDeDano` (valor cheio até
+  o 1º patamar, metade até o 2º, um quinto depois), só que parametrizável
+  pra cada fórmula de %, já que cada uma tem uma faixa bem menor pra
+  trabalhar (no máximo ~15-94 pontos percentuais) do que dano tem.
+- **`chanceDeAcerto`** (Destreza): agora usa patamares 25/80 com divisor
+  3.9 — de 85% no zero até 99% só perto do 99 de Destreza (antes
+  saturava em 26). Continua crescendo em CADA faixa, nunca trava.
+- **`chanceDeCriticoBasico`** (Sorte + Agilidade/4): patamares 20/50 —
+  Sorte pura sobe de 5% até ~49% perto do 99 (antes travava em 60% já
+  aos ~55 pontos).
+- **`chanceDeEsquiva`** (Agilidade + Sorte/6): patamares 35/70 no termo
+  de Agilidade — sobe suave até ~35% perto do 99 de Agilidade.
+- **Segunda vertente da Sorte, sem teto formal**: `bonusChanceDeItemTotal`
+  e `bonusRaridadeDeItemTotal` (que já existiam só a partir de talismãs)
+  agora também somam `sorteTotal/4` e `sorteTotal/40` direto do atributo
+  — sorte também é sobre o que você encontra, não só sobre acertar o
+  golpe crítico. Como essas duas entram em 4 rolagens de loot diferentes
+  (`receberRecompensa`/`receberDescoberta`), cada uma já com seu próprio
+  `min(100, ...)`, não precisa de teto formal aqui: o teto de cada
+  rolagem individual já cuida disso.
+
+### Auditoria de harmonia — os 6 atributos, nas 3 classes
+
+| Atributo | Onde afeta | Trava cedo? |
+|---|---|---|
+| Força | Dano (ataque básico de TODAS as classes + magias `.forca` do Guerreiro) | Não — soft cap 40/70 de `valorEfetivoDeDano`, nunca satura de vez |
+| Vitalidade | Vida máxima (×3) + Defesa (×1) + recurso do Guerreiro/Ladino (×2) | Não — tudo linear, sem teto nenhum |
+| Inteligência | Dano de magias `.inteligencia` (Mago + parte do Ladino) + Mana do Mago | Não — mesmo soft cap de Força, mais Mana linear |
+| Destreza | Acerto físico E mágico, de qualquer classe | **Corrigido** (era 26, agora só perto de 99) |
+| Agilidade | Esquiva + parte do crítico (todas as classes) + dano de magias `.agilidade` do Ladino | **Corrigido** a parte de esquiva/crítico; a parte de dano do Ladino já não travava (soft cap) |
+| Sorte | Crítico (todas as classes) + esquiva (parte menor) + **agora também** chance/raridade de loot | **Corrigido** o crítico; loot é avenida nova sem teto |
+
+Cada atributo tem pelo menos UMA vertente que nunca satura de vez pra
+qualquer classe — mesmo Destreza (só acerto, por design: a descrição do
+Ladino já dizia "Destreza garante que seus golpes não errem", separado
+de "Agilidade e Sorte aumentam crítico e esquiva") continua rendendo
+algo até o 99, só que devagar, igual toda fórmula de soft cap deste
+jogo. Inteligência continuar "morta" pro Guerreiro puro (nenhuma magia
+dele usa `.inteligencia`, e o recurso dele é Vitalidade) é intencional,
+não bug — o mesmo vale pra qualquer stat fora do tema da classe em
+qualquer RPG de referência; a build ainda é uma escolha real (investir
+ali é phase puramente pra multiclasse/talismã, não pra combate).
+
+Validado por simulação em Python (não só leitura) cobrindo builds puras
+(só Destreza, só Sorte, só Agilidade) e híbridas (Ladino somando
+Agilidade+Sorte nas mesmas duas fórmulas — nesse caso as duas saturam
+mais cedo por design, já que estão investindo em duas fontes pro mesmo
+teto ao mesmo tempo, o que é o trade-off esperado de um build híbrido,
+não um bug). Balanceamento de chaves/parênteses + auditoria de ordem de
+argumentos, sem regressão. Sem playtest real de novo — o próximo teste
+valida se os novos patamares "sentem" bem em jogo.

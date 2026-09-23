@@ -348,12 +348,17 @@ struct Personagem: Codable {
         bonusAtivos.reduce(0) { $0 + $1.bonusOuroPercentual }
     }
 
+    // Segunda vertente da Sorte (além do crítico, ver `chanceDeCriticoBasico`)
+    // — sem teto formal (o `min(100, ...)` de cada rolagem de loot já cuida
+    // disso), então continua valendo a pena investir mesmo depois do
+    // crítico saturar. Puro tema de LUK: sorte também é sobre o que você
+    // encontra, não só sobre acertar o golpe.
     var bonusChanceDeItemTotal: Int {
-        bonusAtivos.reduce(0) { $0 + $1.bonusChanceDeItemPercentual }
+        bonusAtivos.reduce(0) { $0 + $1.bonusChanceDeItemPercentual } + sorteTotal / 4
     }
 
     var bonusRaridadeDeItemTotal: Int {
-        bonusAtivos.reduce(0) { $0 + $1.bonusRaridadeDeItem }
+        bonusAtivos.reduce(0) { $0 + $1.bonusRaridadeDeItem } + sorteTotal / 40
     }
 
     // Bônus concedido pela Grande Rúnica atualmente ativa (vazio se nenhuma
@@ -395,24 +400,59 @@ struct Personagem: Codable {
         }
     }
 
+    // Retorno decrescente genérico pra atributos que regem uma % de
+    // chance (acerto/crítico/esquiva) — mesma filosofia de
+    // `valorEfetivoDeDano` (valor cheio até o 1º patamar, metade até o
+    // 2º, um quinto depois), só que parametrizável, já que cada uma
+    // dessas 3 fórmulas tem uma faixa de % bem menor pra trabalhar (no
+    // máximo uns 15-95 pontos percentuais) do que o dano tem.
+    //
+    // Existia antes só como um teto absoluto (`min(98, 85 + Destreza/2)`
+    // etc.) — Destreza saturava com só 26 pontos, Sorte com uns 55, e
+    // depois disso QUALQUER ponto a mais virava puro desperdício. Bom
+    // pro jogador nunca perceber (o menu de evolução não avisa "esse
+    // atributo já não faz mais nada"), péssimo pra build: o sistema de
+    // custo cúbico até o 99 (ver `custoEmRunas`) só faz sentido se todo
+    // atributo continuar valendo alguma coisa até lá — com um teto
+    // absoluto batido cedo, ninguém jamais investiria em Destreza/Sorte
+    // além do mínimo, travando a build de qualquer classe no mesmo
+    // padrão "acerto/crítico no básico, resto tudo no atributo
+    // principal".
+    static func valorEfetivoDeChance(_ bruto: Int, primeiroPatamar: Int, segundoPatamar: Int) -> Double {
+        if bruto <= primeiroPatamar {
+            return Double(bruto)
+        }
+        if bruto <= segundoPatamar {
+            return Double(primeiroPatamar) + Double(bruto - primeiroPatamar) * 0.5
+        }
+        let atePrimeiroESegundo = Double(primeiroPatamar) + Double(segundoPatamar - primeiroPatamar) * 0.5
+        return atePrimeiroESegundo + Double(bruto - segundoPatamar) * 0.2
+    }
+
     // Sorte é quem mais rege o crítico (como LUK no Ragnarok); Agilidade
     // contribui um pouco, mantendo o Ladino "ágil e certeiro" mesmo sem
-    // investir tudo em Sorte.
+    // investir tudo em Sorte. Sorte sozinha (sem Agilidade nenhuma) sobe
+    // de 5% no zero até ~49% perto do 99 — nunca satura de vez.
     var chanceDeCriticoBasico: Int {
-        min(60, 5 + sorteTotal + agilidadeTotal / 4)
+        let sorteEfetiva = Personagem.valorEfetivoDeChance(sorteTotal, primeiroPatamar: 20, segundoPatamar: 50)
+        return min(60, 5 + Int(sorteEfetiva) + agilidadeTotal / 4)
     }
 
     // Agilidade rege a esquiva (como AGI/FLEE); Sorte contribui um pouco
     // (a "esquiva perfeita" do LUK).
     var chanceDeEsquiva: Int {
-        min(35, agilidadeTotal / 3 + sorteTotal / 6)
+        let agilidadeEfetiva = Personagem.valorEfetivoDeChance(agilidadeTotal, primeiroPatamar: 35, segundoPatamar: 70)
+        return min(35, Int(agilidadeEfetiva / 1.6) + sorteTotal / 6)
     }
 
     // Destreza rege a chance de acerto — física e mágica. Sem nenhum ponto
     // investido o herói ainda acerta a maior parte das vezes (85%): errar
     // é o "tempero" de não investir em Destreza, não uma punição severa.
+    // A faixa inteira (85%→99%) só se completa perto do 99 de Destreza —
+    // antes saturava com só 26.
     var chanceDeAcerto: Int {
-        min(98, 85 + destrezaTotal / 2)
+        let destrezaEfetiva = Personagem.valorEfetivoDeChance(destrezaTotal, primeiroPatamar: 25, segundoPatamar: 80)
+        return min(99, 85 + Int(destrezaEfetiva / 3.9))
     }
 
     // O atributo que "alimenta" o recurso de combate da classe: Vitalidade
