@@ -14,7 +14,16 @@ struct Inimigo {
     var xpRecompensa: Int
     var ouroRecompensa: ClosedRange<Int>
     var chefe: Bool
+    // Inimigo de elite: um "field boss" estilo Elden Ring — raro de
+    // encontrar explorando, mais forte que o comum da zona, mas sem dar
+    // Grande Rúnica (isso continua exclusivo do chefe de verdade).
+    var elite: Bool = false
     var zonaOrigem: String
+    // % de resistência (positivo) ou fraqueza (negativo) por elemento de
+    // dano (ver `ElementoDeDano`/`Zona.resistenciasDaZona`) — nunca
+    // persistido (o `Inimigo` só existe durante um combate), então livre
+    // pra crescer sem nenhuma preocupação de Codable/save.
+    var resistencias: [ElementoDeDano: Int] = [:]
 
     var estaVivo: Bool { vidaAtual > 0 }
 }

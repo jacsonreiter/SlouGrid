@@ -1,8 +1,22 @@
 import SwiftUI
 
+// Categoria de item mostrada em cada aba do mercado — separa Acessórios
+// (bônus de atributo puro) de Talismãs (efeitos passivos, ver
+// `Item.ehTalisma`), embora os dois usem `TipoDeItem.acessorio` por baixo.
+enum AbaDoMercado: String, CaseIterable, Identifiable {
+    case pocoes = "Poções"
+    case armas = "Armas"
+    case armaduras = "Armaduras"
+    case acessorios = "Acessórios"
+    case talismas = "Talismãs"
+
+    var id: String { rawValue }
+}
+
 struct TelaDoMercado: View {
     @EnvironmentObject var vm: GameViewModel
     @State private var mensagem = ""
+    @State private var abaSelecionada: AbaDoMercado = .pocoes
 
     var body: some View {
         ScrollView {
@@ -19,19 +33,41 @@ struct TelaDoMercado: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
 
+                Picker("Categoria", selection: $abaSelecionada) {
+                    ForEach(AbaDoMercado.allCases) { aba in
+                        Text(aba.rawValue).tag(aba)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 if !mensagem.isEmpty {
                     Text(mensagem)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
-                ForEach(Item.catalogoParaClasse(vm.heroi.classe)) { item in
+                ForEach(itensDaAba) { item in
                     linhaDoItem(item)
                 }
             }
             .padding()
         }
         .navigationTitle("Mercado")
+    }
+
+    // Itens da classe atual, filtrados pela aba selecionada e ordenados por
+    // nível mínimo — pra sempre mostrar o mais acessível primeiro.
+    var itensDaAba: [Item] {
+        let doCatalogo = Item.catalogoParaClasse(vm.heroi.classe)
+        let filtrados: [Item]
+        switch abaSelecionada {
+        case .pocoes: filtrados = doCatalogo.filter { $0.tipo == .pocao }
+        case .armas: filtrados = doCatalogo.filter { $0.tipo == .arma }
+        case .armaduras: filtrados = doCatalogo.filter { $0.tipo == .armadura }
+        case .acessorios: filtrados = doCatalogo.filter { $0.tipo == .acessorio && !$0.ehTalisma }
+        case .talismas: filtrados = doCatalogo.filter { $0.tipo == .acessorio && $0.ehTalisma }
+        }
+        return filtrados.sorted { $0.nivelMinimo < $1.nivelMinimo }
     }
 
     func linhaDoItem(_ item: Item) -> some View {

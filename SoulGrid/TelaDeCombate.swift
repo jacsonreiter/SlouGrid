@@ -7,17 +7,57 @@ struct TelaDeCombate: View {
 
     let zona: Zona
     let contraChefe: Bool
+    let elite: Bool
+    // Guardado (não só usado no init) porque "Continuar Explorando" gera
+    // um novo inimigo sem sair da tela — precisa do nível de novo.
+    let nivelHeroi: Int
+    // Idem: "Continuar Explorando" precisa regerar inimigos com o mesmo
+    // multiplicador de New Game+ do resto do combate (ver `Zona.
+    // multiplicadorDeCiclo`).
+    let cicloNewGamePlus: Int
 
-    @State private var inimigo: Inimigo
+    // Sempre um array, mesmo contra chefe/elite (grupo de 1) — um único
+    // caminho de código pra combate solo ou em grupo, em vez de duplicar
+    // toda a lógica. Ver `Zona.gerarGrupoComum`.
+    @State private var inimigos: [Inimigo]
+    @State private var indiceAlvo: Int = 0
     @State private var log: [String] = []
     @State private var combateEncerrado = false
     @State private var vitoria = false
     @State private var mostrandoItens = false
     @State private var mostrandoMagias = false
 
-    // Efeitos ativos no inimigo (só duram durante este combate).
-    @State private var veneno: (dano: Int, turnos: Int)? = nil
-    @State private var inimigoAtordoado = false
+    // Efeitos ativos nos inimigos (só duram durante este combate), um por
+    // índice do array — permite vários inimigos envenenados/atordoados ao
+    // mesmo tempo num grupo.
+    @State private var venenoPorAlvo: [Int: (dano: Int, turnos: Int)] = [:]
+    @State private var atordoadoPorAlvo: Set<Int> = []
+    // Sangramento/Calafrio (estilo Bleed/Frostbite de Elden Ring): cada
+    // acerto do tipo soma um acúmulo; ao cruzar o limiar, o efeito
+    // "estoura" (explosão de dano proporcional à vida máxima do alvo, pro
+    // Sangramento; atordoamento imediato, pro Calafrio) e o acúmulo zera.
+    // Sem dano por turno — a ameaça é o próprio estouro, não um DoT.
+    @State private var sangramentoPorAlvo: [Int: Int] = [:]
+    @State private var calafrioPorAlvo: [Int: Int] = [:]
+    // Queimadura: dano por turno (como o veneno) + reduz a Defesa do alvo
+    // enquanto ativa — o "shred" que diferencia ela do veneno comum e dá ao
+    // mago de fogo uma identidade própria (abrir caminho pros aliados
+    // baterem mais forte, não só dano isolado).
+    @State private var queimaduraPorAlvo: [Int: (dano: Int, turnos: Int, reducaoDefesa: Int)] = [:]
+    private let limiarDeSangramento = 100
+    private let limiarDeCalafrio = 100
+    private let percentualExplosaoSangramento = 0.20
+
+    // Golpe carregado do chefe (estilo "telegraph" de RPG por turnos, ver
+    // `aplicarAtaqueDoChefe`) — só chefes fazem isso, e só existe um chefe
+    // por combate (array de 1), então continuam sendo estado escalar.
+    @State private var turnosAteGolpeDoChefe = Int.random(in: 2...4)
+    @State private var chefePrestesAGolpear = false
+    // Depois de atordoado, o chefe fica 2 turnos imune a um novo
+    // atordoamento — sem isso, uma magia atordoante recastada todo turno
+    // travava o chefe pra sempre, sem ele nunca conseguir agir. Elite é
+    // sempre imune (ver `lancarMagia`), forte demais pra ser controlado assim.
+    @State private var turnosDeImunidadeAAtordoamento = 0
 
     // Fortalecimentos ativos no herói (só duram durante este combate,
     // nunca alteram os atributos salvos do personagem).
@@ -30,18 +70,21 @@ struct TelaDeCombate: View {
     @State private var bonusAgilidadeTemporaria = 0
     @State private var turnosDeBonusAgilidade = 0
 
-    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int) {
+    init(zona: Zona, contraChefe: Bool, nivelHeroi: Int, elite: Bool = false, cicloNewGamePlus: Int = 0) {
         self.zona = zona
         self.contraChefe = contraChefe
-        _inimigo = State(initialValue: contraChefe
-            ? zona.gerarChefe(nivelHeroi: nivelHeroi)
-            : zona.gerarInimigoComum(nivelHeroi: nivelHeroi))
+        self.elite = elite
+        self.nivelHeroi = nivelHeroi
+        self.cicloNewGamePlus = cicloNewGamePlus
+        _inimigos = State(initialValue: contraChefe
+            ? [zona.gerarChefe(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)]
+            : (elite ? [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)] : zona.gerarGrupoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)))
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                inimigoCard
+                inimigosCard
                 heroiCard
                 logDeCombate
 
@@ -66,41 +109,97 @@ struct TelaDeCombate: View {
 
     // MARK: - Cartões de status
 
-    var inimigoCard: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: inimigo.icone)
-                    .font(.system(size: 40))
-                    .foregroundColor(inimigo.chefe ? .red : .primary)
-                VStack(alignment: .leading) {
-                    Text(inimigo.nome).font(.title3).fontWeight(.bold)
-                    Text("Nível \(inimigo.nivel)\(inimigo.chefe ? " · Chefe" : "")")
+    var inimigosCard: some View {
+        VStack(spacing: 10) {
+            if inimigos.count > 1 {
+                Text("Toque em um inimigo para focar seus ataques nele.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            ForEach(Array(inimigos.enumerated()), id: \.offset) { indice, inimigoDaLista in
+                cartaoDeInimigo(indice: indice, inimigoDaLista: inimigoDaLista)
+            }
+        }
+    }
+
+    func cartaoDeInimigo(indice: Int, inimigoDaLista: Inimigo) -> some View {
+        let emFoco = indice == indiceAlvo && inimigoDaLista.estaVivo
+        let corBase: Color = inimigoDaLista.chefe ? .red : (inimigoDaLista.elite ? .orange : .primary)
+        let corFundo: Color = inimigoDaLista.chefe ? .red : (inimigoDaLista.elite ? .orange : .gray)
+
+        return Button {
+            selecionarAlvo(indice)
+        } label: {
+            VStack(spacing: 8) {
+                HStack {
+                    Image(systemName: inimigoDaLista.icone)
+                        .font(.system(size: 34))
+                        .foregroundColor(corBase)
+                    VStack(alignment: .leading) {
+                        Text(inimigoDaLista.nome).font(.subheadline).fontWeight(.bold)
+                        Text("Nível \(inimigoDaLista.nivel)\(inimigoDaLista.chefe ? " · Chefe" : (inimigoDaLista.elite ? " · Elite" : ""))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        if venenoPorAlvo[indice] != nil {
+                            Label("Envenenado", systemImage: "drop.fill")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                        }
+                        if atordoadoPorAlvo.contains(indice) {
+                            Label("Atordoado", systemImage: "zzz")
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
+                        }
+                        if let acumulo = sangramentoPorAlvo[indice] {
+                            Label("Sangrando (\(acumulo)/\(limiarDeSangramento))", systemImage: "drop.triangle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                        }
+                        if let acumulo = calafrioPorAlvo[indice] {
+                            Label("Calafrio (\(acumulo)/\(limiarDeCalafrio))", systemImage: "snowflake")
+                                .font(.caption2)
+                                .foregroundColor(.cyan)
+                        }
+                        if queimaduraPorAlvo[indice] != nil {
+                            Label("Queimando", systemImage: "flame.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                        if inimigoDaLista.chefe && chefePrestesAGolpear {
+                            Label("Carregando golpe!", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+                if inimigoDaLista.estaVivo {
+                    ProgressView(value: Double(inimigoDaLista.vidaAtual), total: Double(inimigoDaLista.vidaMaxima))
+                        .tint(.red)
+                    Text("\(inimigoDaLista.vidaAtual) / \(inimigoDaLista.vidaMaxima) vida")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Derrotado")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    if veneno != nil {
-                        Label("Envenenado", systemImage: "drop.fill")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                    }
-                    if inimigoAtordoado {
-                        Label("Atordoado", systemImage: "zzz")
-                            .font(.caption2)
-                            .foregroundColor(.yellow)
-                    }
-                }
             }
-            ProgressView(value: Double(inimigo.vidaAtual), total: Double(inimigo.vidaMaxima))
-                .tint(.red)
-            Text("\(inimigo.vidaAtual) / \(inimigo.vidaMaxima) vida")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            .padding()
+            .background(corFundo.opacity(inimigoDaLista.estaVivo ? (emFoco ? 0.22 : 0.1) : 0.05))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(emFoco ? Color.blue : Color.clear, lineWidth: 2)
+            )
+            .cornerRadius(12)
         }
-        .padding()
-        .background(inimigo.chefe ? Color.red.opacity(0.1) : Color.gray.opacity(0.1))
-        .cornerRadius(12)
+        .buttonStyle(.plain)
+        .foregroundColor(.primary)
+        .disabled(!inimigoDaLista.estaVivo || combateEncerrado)
+        .opacity(inimigoDaLista.estaVivo ? 1 : 0.6)
     }
 
     var heroiCard: some View {
@@ -160,17 +259,31 @@ struct TelaDeCombate: View {
         .cornerRadius(12)
     }
 
+    // Tamanho fixo com rolagem própria — antes crescia sem parar conforme o
+    // combate avançava, empurrando os botões de ação cada vez mais pra
+    // baixo da tela. Ordem cronológica (mais antiga no topo) com auto-scroll
+    // pra última linha a cada evento novo, como um log de chat de verdade.
     var logDeCombate: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(Array(log.enumerated().reversed()), id: \.offset) { _, linha in
-                Text(linha).font(.caption)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(log.enumerated()), id: \.offset) { indice, linha in
+                        Text(linha).font(.caption).id(indice)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+            }
+            .background(Color.gray.opacity(0.06))
+            .cornerRadius(10)
+            .frame(height: 140)
+            .onChange(of: log.count) { _ in
+                guard let ultimoIndice = log.indices.last else { return }
+                withAnimation {
+                    proxy.scrollTo(ultimoIndice, anchor: .bottom)
+                }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.gray.opacity(0.06))
-        .cornerRadius(10)
-        .frame(minHeight: 80)
     }
 
     // MARK: - Ações
@@ -302,6 +415,11 @@ struct TelaDeCombate: View {
         .disabled(atuais <= 0 || combateEncerrado)
     }
 
+    // Depois de uma vitória (ou descoberta), o jogador escolhe: sair da
+    // masmorra com o que já ganhou, ou continuar explorando ali mesmo, sem
+    // voltar pro menu — encadeando encontros dentro da mesma visita, como
+    // um "delve" de roguelike. Só derrota não oferece continuar (a vida
+    // zerada não dá pra seguir; volte e descanse).
     var resultadoBox: some View {
         VStack(spacing: 12) {
             Image(systemName: vitoria ? "checkmark.seal.fill" : "xmark.seal.fill")
@@ -310,13 +428,35 @@ struct TelaDeCombate: View {
             Text(vitoria ? "Vitória!" : "Derrota")
                 .font(.title)
                 .fontWeight(.bold)
-            Button("Continuar") { dismiss() }
-                .font(.title3)
-                .padding(.horizontal, 30)
-                .padding(.vertical, 10)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(12)
+
+            if vitoria {
+                HStack(spacing: 12) {
+                    Button("Sair da Masmorra") { dismiss() }
+                        .font(.subheadline)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+
+                    Button("Continuar Explorando") { continuarExplorando() }
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+            } else {
+                Button("Voltar") { dismiss() }
+                    .font(.title3)
+                    .padding(.horizontal, 30)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
         }
         .padding()
     }
@@ -390,9 +530,74 @@ struct TelaDeCombate: View {
     // MARK: - Lógica de combate
 
     private func iniciarSeNecessario() {
-        if log.isEmpty {
-            log.append(inimigo.chefe ? "O chefe \(inimigo.nome) apareceu!" : "\(inimigo.nome) apareceu!")
+        guard log.isEmpty else { return }
+        anunciarInimigo()
+    }
+
+    private func anunciarInimigo() {
+        if inimigos.count > 1 {
+            log.append("Um grupo de \(inimigos.count) inimigos apareceu: \(inimigos.map { $0.nome }.joined(separator: ", "))!")
+        } else if let unico = inimigos.first {
+            if unico.chefe {
+                log.append("O chefe \(unico.nome) apareceu!")
+            } else if unico.elite {
+                log.append("Um inimigo de elite, \(unico.nome), apareceu! Ele é mais forte que o normal da zona — cuidado.")
+            } else {
+                log.append("\(unico.nome) apareceu!")
+            }
         }
+    }
+
+    // "Continuar Explorando" (ver `resultadoBox`): sorteia o próximo
+    // encontro dentro da MESMA zona, sem sair da tela — reaproveita
+    // `Zona.sortearEncontro()`, a mesma variedade do botão "Explorar" das
+    // Masmorras. Depois de um chefe, o próximo encontro é sempre um
+    // encontro comum de exploração (nunca outro chefe).
+    private func continuarExplorando() {
+        switch zona.sortearEncontro() {
+        case .comum:
+            inimigos = zona.gerarGrupoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
+            iniciarNovoEncontro()
+        case .eliteDeCampo:
+            inimigos = [zona.gerarInimigoDeElite(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)]
+            iniciarNovoEncontro()
+        case .descoberta:
+            let recompensa = vm.heroi.receberDescoberta(zonaNome: zona.nome, nivelZona: zona.nivelBaseInimigos)
+            var texto = "Você encontrou \(recompensa.runas) Runas explorando mais fundo, sem cruzar com nenhum inimigo."
+            if let item = recompensa.item {
+                texto += " Também achou: \(item.nome)!"
+            }
+            log.append(texto)
+            // Continua em "resultado" (combateEncerrado/vitoria já true) —
+            // o resultadoBox some de novo com Sair/Continuar.
+        }
+    }
+
+    // Reseta todo o estado de UM combate (efeitos, fortalecimentos, golpe
+    // de chefe) sem tocar no herói (vida/energia continuam de onde
+    // pararam) — é o que faz "Continuar Explorando" sentir como seguir
+    // fundo na masmorra, não um combate isolado novo.
+    private func iniciarNovoEncontro() {
+        combateEncerrado = false
+        vitoria = false
+        indiceAlvo = 0
+        venenoPorAlvo = [:]
+        atordoadoPorAlvo = []
+        sangramentoPorAlvo = [:]
+        calafrioPorAlvo = [:]
+        queimaduraPorAlvo = [:]
+        turnosAteGolpeDoChefe = Int.random(in: 2...4)
+        chefePrestesAGolpear = false
+        turnosDeImunidadeAAtordoamento = 0
+        bonusForcaTemporario = 0
+        turnosDeBonusForca = 0
+        bonusDefesaTemporaria = 0
+        turnosDeBonusDefesa = 0
+        bonusInteligenciaTemporaria = 0
+        turnosDeBonusInteligencia = 0
+        bonusAgilidadeTemporaria = 0
+        turnosDeBonusAgilidade = 0
+        anunciarInimigo()
     }
 
     // Destreza rege a chance de acerto — usada tanto pelo ataque básico
@@ -401,24 +606,108 @@ struct TelaDeCombate: View {
         Int.random(in: 1...100) <= vm.heroi.chanceDeAcerto
     }
 
+    private var inimigoAlvo: Inimigo? {
+        guard indiceAlvo >= 0, indiceAlvo < inimigos.count, inimigos[indiceAlvo].estaVivo else { return nil }
+        return inimigos[indiceAlvo]
+    }
+
+    private var algumInimigoVivo: Bool {
+        inimigos.contains(where: { $0.estaVivo })
+    }
+
+    // Se o alvo focado morreu (ou nunca foi válido), foca automaticamente
+    // no próximo inimigo vivo — o jogador sempre pode trocar de novo
+    // tocando em outro cartão.
+    private func avancarAlvoSeNecessario() {
+        if indiceAlvo >= inimigos.count || !inimigos[indiceAlvo].estaVivo {
+            if let proximo = inimigos.firstIndex(where: { $0.estaVivo }) {
+                indiceAlvo = proximo
+            }
+        }
+    }
+
+    private func selecionarAlvo(_ indice: Int) {
+        guard indice >= 0, indice < inimigos.count, inimigos[indice].estaVivo else { return }
+        indiceAlvo = indice
+    }
+
+    // Defesa real do alvo no momento do golpe: a Queimadura reduz a Defesa
+    // da própria placa/armadura enquanto ativa (ver `queimaduraPorAlvo`),
+    // então todo cálculo de dano físico/mágico passa por aqui em vez de ler
+    // `inimigos[indice].defesa` direto.
+    private func defesaEfetiva(doAlvo indice: Int) -> Int {
+        guard let queimadura = queimaduraPorAlvo[indice] else { return inimigos[indice].defesa }
+        return max(0, inimigos[indice].defesa * (100 - queimadura.reducaoDefesa) / 100)
+    }
+
+    // Resistência/fraqueza elemental da zona (ver `Zona.resistenciasDaZona`,
+    // `Magia.elemento`), aplicada por cima da mitigação de Defesa como um
+    // modificador final — positivo reduz o dano, negativo amplifica. Teto
+    // dos dois lados (nunca reduz a quase nada nem amplifica sem limite),
+    // pra escolher a build certa importar sem tornar a errada inútil.
+    private func aplicarResistencia(_ dano: Int, elemento: ElementoDeDano, doAlvo indice: Int) -> Int {
+        let resistencia = inimigos[indice].resistencias[elemento] ?? 0
+        let multiplicador = max(0.4, min(1.5, 1.0 - Double(resistencia) / 100.0))
+        return max(1, Int(Double(dano) * multiplicador))
+    }
+
+    // Feedback textual pra o jogador aprender o perfil elemental do lugar
+    // jogando, sem precisar de um painel de resistências explícito.
+    private func textoDeResistencia(elemento: ElementoDeDano, doAlvo indice: Int) -> String {
+        let resistencia = inimigos[indice].resistencias[elemento] ?? 0
+        if resistencia >= 25 { return " O ataque foi parcialmente resistido." }
+        if resistencia <= -15 { return " Fraqueza explorada!" }
+        return ""
+    }
+
+    // Limpa todo efeito temporário (veneno, atordoamento, sangramento,
+    // calafrio, queimadura) de um alvo — chamado sempre que ele morre, pra
+    // um efeito que ainda estava acumulando/ativo não "vazar" pro próximo
+    // inimigo que vier a ocupar o mesmo índice do array.
+    private func limparEfeitosDoAlvo(_ indice: Int) {
+        venenoPorAlvo[indice] = nil
+        atordoadoPorAlvo.remove(indice)
+        sangramentoPorAlvo[indice] = nil
+        calafrioPorAlvo[indice] = nil
+        queimaduraPorAlvo[indice] = nil
+    }
+
     private func atacar() {
-        guard !combateEncerrado else { return }
+        guard !combateEncerrado, inimigoAlvo != nil else { return }
         guard rolarAcerto() else {
             log.append("Você errou o ataque!")
-            turnoDoInimigo()
+            turnoDosInimigos()
             return
         }
+        vm.heroi.ganharMaestriaComArmaEquipada()
         let resultado = vm.heroi.calcularDanoBasico(bonusForca: bonusForcaTemporario)
-        inimigo.vidaAtual = max(0, inimigo.vidaAtual - resultado.dano)
-        log.append(resultado.critico
-            ? "Você acertou um golpe crítico! -\(resultado.dano) de vida no \(inimigo.nome)."
-            : "Você atacou o \(inimigo.nome) causando \(resultado.dano) de dano.")
-        UIImpactFeedbackGenerator(style: resultado.critico ? .heavy : .medium).impactOccurred()
+        aplicarDanoBasicoAoAlvo(resultado.dano, critico: resultado.critico)
+    }
 
-        if !inimigo.estaVivo {
-            finalizarCombate(vitoria: true)
+    // A Defesa do inimigo (ver `Zona.swift`) mitiga o golpe, espelhando
+    // como a Defesa do herói já funciona em `Personagem.sofrerDano`.
+    private func aplicarDanoBasicoAoAlvo(_ danoBruto: Int, critico: Bool) {
+        let indice = indiceAlvo
+        let danoAposDefesa = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
+        let danoFinal = aplicarResistencia(danoAposDefesa, elemento: .fisico, doAlvo: indice)
+        inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoFinal)
+        let nomeAlvo = inimigos[indice].nome
+        log.append((critico
+            ? "Você acertou um golpe crítico! -\(danoFinal) de vida no \(nomeAlvo)."
+            : "Você atacou o \(nomeAlvo) causando \(danoFinal) de dano.")
+            + textoDeResistencia(elemento: .fisico, doAlvo: indice))
+        UIImpactFeedbackGenerator(style: critico ? .heavy : .medium).impactOccurred()
+
+        if !inimigos[indice].estaVivo {
+            log.append("\(nomeAlvo) foi derrotado!")
+            limparEfeitosDoAlvo(indice)
+            avancarAlvoSeNecessario()
+        }
+
+        if algumInimigoVivo {
+            turnoDosInimigos()
         } else {
-            turnoDoInimigo()
+            finalizarCombate(vitoria: true)
         }
     }
 
@@ -434,66 +723,124 @@ struct TelaDeCombate: View {
         if magia.tipo == .cura {
             vm.heroi.vidaAtual = min(vm.heroi.vidaMaxima, vm.heroi.vidaAtual + magia.valorCura)
             log.append("Você usou \(magia.nome) e recuperou \(magia.valorCura) de vida!")
-            turnoDoInimigo()
+            turnoDosInimigos()
             return
         }
 
         if magia.tipo == .fortalecimento {
-            var partes: [String] = []
-            if magia.bonusForca > 0 {
-                bonusForcaTemporario = magia.bonusForca
-                turnosDeBonusForca = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusForca) força")
-            }
-            if magia.bonusDefesa > 0 {
-                bonusDefesaTemporaria = magia.bonusDefesa
-                turnosDeBonusDefesa = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusDefesa) defesa")
-            }
-            if magia.bonusInteligencia > 0 {
-                bonusInteligenciaTemporaria = magia.bonusInteligencia
-                turnosDeBonusInteligencia = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusInteligencia) inteligência")
-            }
-            if magia.bonusAgilidade > 0 {
-                bonusAgilidadeTemporaria = magia.bonusAgilidade
-                turnosDeBonusAgilidade = magia.duracaoEmTurnos
-                partes.append("+\(magia.bonusAgilidade) agilidade")
-            }
-            log.append("Você usou \(magia.nome)! \(partes.joined(separator: " e ")) por \(magia.duracaoEmTurnos) turnos.")
-            turnoDoInimigo()
+            let partes = aplicarFortalecimento(magia)
+            log.append("Você usou \(magia.nome)! \(partes) por \(magia.duracaoEmTurnos) turnos.")
+            turnoDosInimigos()
             return
         }
+
+        guard inimigoAlvo != nil else { return }
 
         // Magias ofensivas (dano, veneno, atordoante) também dependem de
         // Destreza para acertar — exceto as marcadas como certeiras.
         if !magia.sempreAcerta && !rolarAcerto() {
             log.append("Sua magia \(magia.nome) falhou!")
-            turnoDoInimigo()
+            turnoDosInimigos()
             return
         }
 
         // O atributo que escala a magia depende da classe/magia (Força,
-        // Inteligência ou Agilidade), incluindo fortalecimentos ativos.
-        let atributoBase: Int
+        // Inteligência ou Agilidade), incluindo fortalecimentos ativos —
+        // mesmo soft cap de efetividade do ataque básico (ver
+        // `Personagem.valorEfetivoDeDano`).
+        let atributoBruto: Int
         switch magia.atributoDeEscala {
-        case .forca: atributoBase = vm.heroi.forcaTotal + bonusForcaTemporario
-        case .inteligencia: atributoBase = vm.heroi.inteligenciaTotal + bonusInteligenciaTemporaria
-        case .agilidade: atributoBase = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
+        case .forca: atributoBruto = vm.heroi.forcaTotal + bonusForcaTemporario
+        case .inteligencia: atributoBruto = vm.heroi.inteligenciaTotal + bonusInteligenciaTemporaria
+        case .agilidade: atributoBruto = vm.heroi.agilidadeTotal + bonusAgilidadeTemporaria
+        }
+        let atributoBase = Int(Personagem.valorEfetivoDeDano(atributoBruto))
+        vm.heroi.ganharMaestriaComArmaEquipada()
+        let danoBrutoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
+        // Maestria + talismã do elemento específico da magia + Potência de
+        // Magia (genérico, soma em qualquer magia — nunca no ataque
+        // básico, que não passa por aqui) — os três somam direto no dano
+        // bruto, antes de Defesa/resistência.
+        let bonusPercentual = vm.heroi.bonusDeMaestriaPercentual
+            + vm.heroi.bonusDeDanoPercentualTotal(paraElemento: magia.elemento)
+            + vm.heroi.bonusPotenciaDeMagiaPercentualTotal
+        let danoBruto = danoBrutoBase + danoBrutoBase * bonusPercentual / 100
+
+        let indice = indiceAlvo
+        // Mesma mitigação de Defesa do ataque básico (ver
+        // `aplicarDanoBasicoAoAlvo`) — o veneno/dano por turno logo abaixo
+        // fica de fora de propósito, como o sangramento/veneno de Elden
+        // Ring, que ignora a armadura. Depois da Defesa, a resistência
+        // elemental da zona (ver `aplicarResistencia`) entra como
+        // modificador final — a mesma magia bate diferente dependendo de
+        // onde é usada.
+        let danoAposDefesa = max(1, danoBruto - defesaEfetiva(doAlvo: indice))
+        let danoFinal = aplicarResistencia(danoAposDefesa, elemento: magia.elemento, doAlvo: indice)
+        inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoFinal)
+        let nomeAlvo = inimigos[indice].nome
+        var texto = "Você usou \(magia.nome) e causou \(danoFinal) de dano em \(nomeAlvo)!\(textoDeResistencia(elemento: magia.elemento, doAlvo: indice))"
+
+        var alvoAindaVivo = inimigos[indice].estaVivo
+        if alvoAindaVivo && magia.tipo == .danoComEfeito {
+            let danoPorTurnoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let danoPorTurno = danoPorTurnoBase + danoPorTurnoBase * bonusPercentual / 100
+            venenoPorAlvo[indice] = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos)
+            texto += " \(nomeAlvo) está envenenado."
+        } else if alvoAindaVivo && magia.tipo == .atordoante {
+            if inimigos[indice].elite {
+                // Elite é grande e resistente demais pra ser controlado por
+                // atordoamento — só dano puro funciona nele.
+                texto += " Mas \(nomeAlvo) resiste ao atordoamento — é forte demais!"
+            } else if inimigos[indice].chefe && turnosDeImunidadeAAtordoamento > 0 {
+                texto += " Mas \(nomeAlvo) ainda resiste, se recuperando do último atordoamento!"
+            } else {
+                atordoadoPorAlvo.insert(indice)
+                texto += " \(nomeAlvo) ficou atordoado!"
+            }
+        } else if alvoAindaVivo && magia.tipo == .sangramento {
+            let acumuloBase = magia.acumuloDeStatus ?? 25
+            let acumulo = acumuloBase + acumuloBase * vm.heroi.bonusAcumuloDeStatusPercentualTotal / 100
+            let totalAcumulado = (sangramentoPorAlvo[indice] ?? 0) + acumulo
+            if totalAcumulado >= limiarDeSangramento {
+                let explosaoBruta = max(1, Int(Double(inimigos[indice].vidaMaxima) * percentualExplosaoSangramento))
+                let explosao = aplicarResistencia(explosaoBruta, elemento: .fisico, doAlvo: indice)
+                inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - explosao)
+                sangramentoPorAlvo[indice] = nil
+                texto += " O sangramento de \(nomeAlvo) explode, causando \(explosao) de dano!"
+            } else {
+                sangramentoPorAlvo[indice] = totalAcumulado
+                texto += " Sangramento se acumula em \(nomeAlvo) (\(totalAcumulado)/\(limiarDeSangramento))."
+            }
+        } else if alvoAindaVivo && magia.tipo == .calafrio {
+            let acumuloBase = magia.acumuloDeStatus ?? 25
+            let acumulo = acumuloBase + acumuloBase * vm.heroi.bonusAcumuloDeStatusPercentualTotal / 100
+            let totalAcumulado = (calafrioPorAlvo[indice] ?? 0) + acumulo
+            if totalAcumulado >= limiarDeCalafrio {
+                calafrioPorAlvo[indice] = nil
+                if inimigos[indice].elite {
+                    texto += " Mas \(nomeAlvo) resiste ao calafrio acumulado — é forte demais!"
+                } else if inimigos[indice].chefe && turnosDeImunidadeAAtordoamento > 0 {
+                    texto += " O calafrio acumulado se dissipa, mas \(nomeAlvo) ainda resiste ao atordoamento!"
+                } else {
+                    atordoadoPorAlvo.insert(indice)
+                    texto += " O calafrio acumulado atordoa \(nomeAlvo)!"
+                }
+            } else {
+                calafrioPorAlvo[indice] = totalAcumulado
+                texto += " Calafrio se acumula em \(nomeAlvo) (\(totalAcumulado)/\(limiarDeCalafrio))."
+            }
+        } else if alvoAindaVivo && magia.tipo == .queimadura {
+            let danoPorTurnoBase = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
+            let danoPorTurno = danoPorTurnoBase + danoPorTurnoBase * bonusPercentual / 100
+            let reducao = magia.reducaoDeDefesaPercentual ?? 15
+            queimaduraPorAlvo[indice] = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos, reducaoDefesa: reducao)
+            texto += " \(nomeAlvo) está queimando, com a defesa reduzida em \(reducao)%."
         }
 
-        let dano = max(1, Int(Double(atributoBase) * magia.multiplicadorDano))
-        inimigo.vidaAtual = max(0, inimigo.vidaAtual - dano)
-        var texto = "Você usou \(magia.nome) e causou \(dano) de dano!"
-
-        if magia.tipo == .danoComEfeito {
-            let danoPorTurno = max(1, Int(Double(atributoBase) * magia.multiplicadorDanoPorTurno))
-            veneno = (dano: danoPorTurno, turnos: magia.duracaoEmTurnos)
-            texto += " O inimigo está envenenado."
-        } else if magia.tipo == .atordoante {
-            inimigoAtordoado = true
-            texto += " O inimigo ficou atordoado!"
-        }
+        // A explosão do Sangramento (acima) pode matar o alvo depois do
+        // golpe inicial já ter "confirmado" ele vivo — reconfere antes do
+        // log/limpeza finais, senão a mensagem de derrota nunca aparece.
+        alvoAindaVivo = inimigos[indice].estaVivo
 
         if magia.valorCura > 0 {
             vm.heroi.vidaAtual = min(vm.heroi.vidaMaxima, vm.heroi.vidaAtual + magia.valorCura)
@@ -503,32 +850,74 @@ struct TelaDeCombate: View {
         log.append(texto)
         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
 
-        if !inimigo.estaVivo {
-            finalizarCombate(vitoria: true)
-        } else {
-            turnoDoInimigo()
+        if !alvoAindaVivo {
+            log.append("\(nomeAlvo) foi derrotado!")
+            limparEfeitosDoAlvo(indice)
+            avancarAlvoSeNecessario()
         }
+
+        if algumInimigoVivo {
+            turnoDosInimigos()
+        } else {
+            finalizarCombate(vitoria: true)
+        }
+    }
+
+    // Aplica um bônus temporário de combate (Força/Defesa/Inteligência/
+    // Agilidade) e devolve uma descrição textual — usado tanto por magias
+    // de fortalecimento do grimório (`lancarMagia`) quanto por poções de
+    // fortalecimento (`usarItem`, logo abaixo), já que as duas reaproveitam
+    // o mesmo `Magia.tipo == .fortalecimento`.
+    @discardableResult
+    private func aplicarFortalecimento(_ magia: Magia) -> String {
+        var partes: [String] = []
+        if magia.bonusForca > 0 {
+            bonusForcaTemporario = magia.bonusForca
+            turnosDeBonusForca = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusForca) força")
+        }
+        if magia.bonusDefesa > 0 {
+            bonusDefesaTemporaria = magia.bonusDefesa
+            turnosDeBonusDefesa = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusDefesa) defesa")
+        }
+        if magia.bonusInteligencia > 0 {
+            bonusInteligenciaTemporaria = magia.bonusInteligencia
+            turnosDeBonusInteligencia = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusInteligencia) inteligência")
+        }
+        if magia.bonusAgilidade > 0 {
+            bonusAgilidadeTemporaria = magia.bonusAgilidade
+            turnosDeBonusAgilidade = magia.duracaoEmTurnos
+            partes.append("+\(magia.bonusAgilidade) agilidade")
+        }
+        return partes.joined(separator: " e ")
     }
 
     private func usarFrascoDeVida() {
         guard !combateEncerrado else { return }
         log.append(vm.heroi.usarFrascoDeVida())
-        turnoDoInimigo()
+        turnoDosInimigos()
     }
 
     private func usarFrascoDeEnergia() {
         guard !combateEncerrado else { return }
         log.append(vm.heroi.usarFrascoDeEnergia())
-        turnoDoInimigo()
+        turnoDosInimigos()
     }
 
     private func usarItem(_ pilha: PilhaDeItens) {
         guard !combateEncerrado else { return }
         let efeito = pilha.item.efeitoDePocao
+        let buff = pilha.item.efeitoDeBuffTemporario
         log.append(vm.heroi.usarItem(pilha))
-        if efeito == .antidoto { veneno = nil }
+        if efeito == .antidoto { venenoPorAlvo = [:] }
+        if efeito == .fortalecimento, let buff = buff {
+            let partes = aplicarFortalecimento(buff)
+            log.append("Efeito: \(partes) por \(buff.duracaoEmTurnos) turnos.")
+        }
         mostrandoItens = false
-        turnoDoInimigo()
+        turnoDosInimigos()
     }
 
     private func fugir() {
@@ -539,12 +928,17 @@ struct TelaDeCombate: View {
             vitoria = false
         } else {
             log.append("Você tentou fugir, mas não conseguiu!")
-            turnoDoInimigo()
+            turnoDosInimigos()
         }
     }
 
-    private func turnoDoInimigo() {
-        guard inimigo.estaVivo else { return }
+    // Turno de TODOS os inimigos vivos: cada um age na sua vez — atordoado
+    // perde a vez, o chefe usa seu golpe telegrafado, os demais atacam
+    // normalmente. É isso que torna um grupo mais perigoso que um inimigo
+    // só: o dano recebido no turno soma o de todos que ainda estão de pé,
+    // então ignorar um deles pra focar outro tem custo real.
+    private func turnoDosInimigos() {
+        guard algumInimigoVivo else { return }
 
         aplicarRegenPassivaDeTalisma()
 
@@ -576,35 +970,124 @@ struct TelaDeCombate: View {
                 log.append("O efeito de agilidade aumentada acabou.")
             }
         }
+        if turnosDeImunidadeAAtordoamento > 0 {
+            turnosDeImunidadeAAtordoamento -= 1
+        }
 
-        if let venenoAtivo = veneno {
-            inimigo.vidaAtual = max(0, inimigo.vidaAtual - venenoAtivo.dano)
-            log.append("O veneno causa \(venenoAtivo.dano) de dano em \(inimigo.nome).")
-            veneno = venenoAtivo.turnos <= 1 ? nil : (dano: venenoAtivo.dano, turnos: venenoAtivo.turnos - 1)
-
-            if !inimigo.estaVivo {
-                finalizarCombate(vitoria: true)
-                return
+        for indice in venenoPorAlvo.keys.sorted() {
+            guard indice < inimigos.count, inimigos[indice].estaVivo, let ativo = venenoPorAlvo[indice] else {
+                venenoPorAlvo[indice] = nil
+                continue
+            }
+            let danoDoVeneno = aplicarResistencia(ativo.dano, elemento: .veneno, doAlvo: indice)
+            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoDoVeneno)
+            log.append("O veneno causa \(danoDoVeneno) de dano em \(inimigos[indice].nome).")
+            if !inimigos[indice].estaVivo {
+                log.append("\(inimigos[indice].nome) sucumbiu ao veneno!")
+                limparEfeitosDoAlvo(indice)
+            } else {
+                venenoPorAlvo[indice] = ativo.turnos <= 1 ? nil : (dano: ativo.dano, turnos: ativo.turnos - 1)
             }
         }
 
-        if inimigoAtordoado {
-            log.append("\(inimigo.nome) está atordoado e perde o turno!")
-            inimigoAtordoado = false
-            vm.heroi.regenerarEnergia(5 + vm.heroi.regenEnergiaPorTurno)
-            return
+        for indice in queimaduraPorAlvo.keys.sorted() {
+            guard indice < inimigos.count, inimigos[indice].estaVivo, let ativa = queimaduraPorAlvo[indice] else {
+                queimaduraPorAlvo[indice] = nil
+                continue
+            }
+            let danoDaQueimadura = aplicarResistencia(ativa.dano, elemento: .fogo, doAlvo: indice)
+            inimigos[indice].vidaAtual = max(0, inimigos[indice].vidaAtual - danoDaQueimadura)
+            log.append("A queimadura causa \(danoDaQueimadura) de dano em \(inimigos[indice].nome).")
+            if !inimigos[indice].estaVivo {
+                log.append("\(inimigos[indice].nome) sucumbiu às chamas!")
+                limparEfeitosDoAlvo(indice)
+            } else {
+                queimaduraPorAlvo[indice] = ativa.turnos <= 1 ? nil : (dano: ativa.dano, turnos: ativa.turnos - 1, reducaoDefesa: ativa.reducaoDefesa)
+            }
         }
 
-        let resultado = vm.heroi.sofrerDano(deInimigo: inimigo.forca, bonusDefesa: bonusDefesaTemporaria)
-        if resultado.esquivou {
-            log.append("Você esquivou do ataque de \(inimigo.nome)!")
-        } else {
-            log.append("\(inimigo.nome) atacou você causando \(resultado.dano) de dano.")
+        guard algumInimigoVivo else {
+            finalizarCombate(vitoria: true)
+            return
         }
+        avancarAlvoSeNecessario()
+
+        for indice in inimigos.indices where inimigos[indice].estaVivo {
+            if atordoadoPorAlvo.contains(indice) {
+                log.append("\(inimigos[indice].nome) está atordoado e perde o turno!")
+                atordoadoPorAlvo.remove(indice)
+                if inimigos[indice].chefe {
+                    turnosDeImunidadeAAtordoamento = 2
+                }
+                continue
+            }
+            if inimigos[indice].chefe {
+                aplicarAtaqueDoChefe(indice: indice)
+            } else {
+                let resultado = vm.heroi.sofrerDano(deInimigo: inimigos[indice].forca, bonusDefesa: bonusDefesaTemporaria)
+                if resultado.esquivou {
+                    log.append("Você esquivou do ataque de \(inimigos[indice].nome)!")
+                } else {
+                    log.append("\(inimigos[indice].nome) atacou você causando \(resultado.dano) de dano.")
+                }
+            }
+            if !vm.heroi.estaVivo { break }
+        }
+
         vm.heroi.regenerarEnergia(5 + vm.heroi.regenEnergiaPorTurno)
 
         if !vm.heroi.estaVivo {
             finalizarCombate(vitoria: false)
+        }
+    }
+
+    // O que diferencia um chefe de um inimigo comum, além dos números: a
+    // cada poucos turnos, em vez de atacar, ele avisa que está carregando um
+    // golpe pesado — o jogador ganha o turno seguinte pra reagir (curar,
+    // fortalecer a defesa, beber o Frasco) antes do golpe vir com força
+    // total. Estilo o "telegraph" clássico de RPG por turnos: dá pra
+    // aprender o padrão e se preparar, não é um dano surpresa injusto.
+    // Abaixo de 40% de vida o chefe "enfurece" (estilo fase 2 dos chefes de
+    // Elden Ring): carrega mais rápido e bate mais forte — a luta fica mais
+    // tensa perto do fim, não mais fácil.
+    private func aplicarAtaqueDoChefe(indice: Int) {
+        let vidaPercentual = Double(inimigos[indice].vidaAtual) / Double(max(1, inimigos[indice].vidaMaxima))
+        let enfurecido = vidaPercentual <= 0.4
+        // Faixa em vez de valor fixo: um chefe previsível demais vira um
+        // padrão de memorização puro, não um combate de verdade — variar o
+        // tempo de carga (sem nunca sair da faixa "aprendível") mantém o
+        // telegraph honesto sem deixar o jogador decorar o timing exato.
+        let turnosDeCarga = enfurecido ? Int.random(in: 1...2) : Int.random(in: 2...4)
+        let multiplicadorDoGolpe = enfurecido ? 2.6 : 2.2
+
+        if chefePrestesAGolpear {
+            let forcaDoGolpe = Int(Double(inimigos[indice].forca) * multiplicadorDoGolpe)
+            let resultado = vm.heroi.sofrerDano(deInimigo: forcaDoGolpe, bonusDefesa: bonusDefesaTemporaria)
+            if resultado.esquivou {
+                log.append("Você esquivou do golpe carregado de \(inimigos[indice].nome)!")
+            } else {
+                log.append("O golpe carregado de \(inimigos[indice].nome) atinge em cheio, causando \(resultado.dano) de dano!")
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            chefePrestesAGolpear = false
+            turnosAteGolpeDoChefe = turnosDeCarga
+            return
+        }
+
+        turnosAteGolpeDoChefe -= 1
+        if turnosAteGolpeDoChefe <= 0 {
+            chefePrestesAGolpear = true
+            log.append(enfurecido
+                ? "\(inimigos[indice].nome) entra em fúria e começa a carregar um golpe ainda mais devastador!"
+                : "\(inimigos[indice].nome) começa a carregar um golpe devastador! Prepare-se para o próximo turno.")
+            return
+        }
+
+        let resultado = vm.heroi.sofrerDano(deInimigo: inimigos[indice].forca, bonusDefesa: bonusDefesaTemporaria)
+        if resultado.esquivou {
+            log.append("Você esquivou do ataque de \(inimigos[indice].nome)!")
+        } else {
+            log.append("\(inimigos[indice].nome) atacou você causando \(resultado.dano) de dano.")
         }
     }
 
@@ -623,17 +1106,29 @@ struct TelaDeCombate: View {
         self.vitoria = vitoria
 
         if vitoria {
-            let recompensa = vm.heroi.receberRecompensa(deInimigo: inimigo)
-            var texto = "Vitória! +\(recompensa.runas) Runas."
-            if let item = recompensa.item {
-                texto += " Encontrou: \(item.nome)!"
+            var totalRunas = 0
+            var itensGanhos: [String] = []
+            var novaRunicaGanha: String? = nil
+            for inimigoDerrotado in inimigos {
+                let recompensa = vm.heroi.receberRecompensa(deInimigo: inimigoDerrotado)
+                totalRunas += recompensa.runas
+                if let item = recompensa.item { itensGanhos.append(item.nome) }
+                if let zonaDaRunica = recompensa.novaRunica { novaRunicaGanha = zonaDaRunica }
+            }
+            var texto = "Vitória! +\(totalRunas) Runas."
+            if !itensGanhos.isEmpty {
+                texto += " Encontrou: \(itensGanhos.joined(separator: ", "))!"
             }
             log.append(texto)
-            if let zonaDaRunica = recompensa.novaRunica {
+            if let zonaDaRunica = novaRunicaGanha {
                 log.append("Você conquistou a Grande Rúnica de \(zonaDaRunica)! Selecione-a na tela de Equipamento e descanse para ativá-la.")
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } else {
+            // Derrota zera a sequência de exploração (ver
+            // `Personagem.descansar`/`bonusDeSequenciaPercentual`) — o risco
+            // real de continuar empurrando a sorte em vez de descansar.
+            vm.heroi.sequenciaDeExploracao = 0
             log.append("Você foi derrotado! Volte para descansar.")
             UINotificationFeedbackGenerator().notificationOccurred(.error)
         }

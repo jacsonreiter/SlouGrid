@@ -2,6 +2,15 @@ import SwiftUI
 
 struct TelaDeMasmorras: View {
     @EnvironmentObject var vm: GameViewModel
+    // O que "Explorar" rendeu — decidido antes de navegar, pois um dos
+    // resultados (descoberta) nem entra na tela de combate. Usa o padrão
+    // de NavigationLink oculto + `isActive` (em vez de
+    // `navigationDestination(item:)`, que só existe a partir do iOS 17 —
+    // este projeto mira iOS 16.2).
+    @State private var zonaParaExplorar: Zona?
+    @State private var eliteParaExplorar = false
+    @State private var navegandoParaExploracao = false
+    @State private var mensagemDeDescoberta: String?
 
     var body: some View {
         ScrollView {
@@ -12,6 +21,10 @@ struct TelaDeMasmorras: View {
                 Text("Escolha uma zona para explorar")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+
+                if vm.heroi.sequenciaDeExploracao > 0 {
+                    sequenciaBox
+                }
 
                 if !vm.heroi.estaVivo {
                     VStack(spacing: 12) {
@@ -32,6 +45,68 @@ struct TelaDeMasmorras: View {
             .padding()
         }
         .navigationTitle("Masmorras")
+        .background(
+            Group {
+                if let zona = zonaParaExplorar {
+                    NavigationLink(
+                        destination: TelaDeCombate(zona: zona, contraChefe: false, nivelHeroi: vm.heroi.nivel, elite: eliteParaExplorar, cicloNewGamePlus: vm.heroi.cicloNewGamePlus),
+                        isActive: $navegandoParaExploracao
+                    ) { EmptyView() }
+                }
+            }
+        )
+        .alert("Descoberta!", isPresented: Binding(
+            get: { mensagemDeDescoberta != nil },
+            set: { mostrando in if !mostrando { mensagemDeDescoberta = nil } }
+        )) {
+            Button("OK") { mensagemDeDescoberta = nil }
+        } message: {
+            Text(mensagemDeDescoberta ?? "")
+        }
+    }
+
+    // Mostra a sequência de exploração e o bônus de Runas que ela já dá —
+    // lembra o jogador da decisão em aberto: continuar empurrando a sorte
+    // por mais recompensa, ou voltar pra "Descansar" e zerar com segurança.
+    var sequenciaBox: some View {
+        HStack {
+            Label("Sequência de Exploração: \(vm.heroi.sequenciaDeExploracao)", systemImage: "flame.fill")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            Spacer()
+            Text("+\(vm.heroi.bonusDeSequenciaPercentual)% Runas")
+                .font(.subheadline)
+                .fontWeight(.bold)
+        }
+        .foregroundColor(.orange)
+        .padding(10)
+        .background(Color.orange.opacity(0.12))
+        .cornerRadius(10)
+    }
+
+    // Como no mapa aberto de Elden Ring: a maior parte das explorações leva
+    // a um combate comum, mas às vezes rende um inimigo de elite (mais
+    // forte, mais recompensa) ou uma descoberta pacífica (sem combate).
+    // Rolado aqui, antes de navegar, porque uma descoberta nem abre a tela
+    // de combate.
+    func iniciarExploracao(_ zona: Zona) {
+        switch zona.sortearEncontro() {
+        case .comum:
+            zonaParaExplorar = zona
+            eliteParaExplorar = false
+            navegandoParaExploracao = true
+        case .eliteDeCampo:
+            zonaParaExplorar = zona
+            eliteParaExplorar = true
+            navegandoParaExploracao = true
+        case .descoberta:
+            let recompensa = vm.heroi.receberDescoberta(zonaNome: zona.nome, nivelZona: zona.nivelBaseInimigos)
+            var texto = "Você encontrou \(recompensa.runas) Runas explorando \(zona.nome), sem cruzar com nenhum inimigo."
+            if let item = recompensa.item {
+                texto += " Também achou: \(item.nome)!"
+            }
+            mensagemDeDescoberta = texto
+        }
     }
 
     // MARK: - Faixas de nível
@@ -88,7 +163,9 @@ struct TelaDeMasmorras: View {
                     .foregroundColor(.secondary)
 
                 HStack {
-                    NavigationLink(destination: TelaDeCombate(zona: zona, contraChefe: false, nivelHeroi: vm.heroi.nivel)) {
+                    Button {
+                        iniciarExploracao(zona)
+                    } label: {
                         Text("Explorar")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
@@ -97,7 +174,7 @@ struct TelaDeMasmorras: View {
                             .cornerRadius(10)
                     }
 
-                    NavigationLink(destination: TelaDeCombate(zona: zona, contraChefe: true, nivelHeroi: vm.heroi.nivel)) {
+                    NavigationLink(destination: TelaDeCombate(zona: zona, contraChefe: true, nivelHeroi: vm.heroi.nivel, cicloNewGamePlus: vm.heroi.cicloNewGamePlus)) {
                         Text("Desafiar Chefe")
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)

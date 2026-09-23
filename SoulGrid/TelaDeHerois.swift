@@ -7,6 +7,13 @@ struct TelaDeHerois: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                Image("Logo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 150)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .shadow(color: .black.opacity(0.25), radius: 8, y: 4)
+
                 Text("Olá, \(vm.perfil?.nomeDoJogador ?? "Jogador")!")
                     .font(.title2)
                     .fontWeight(.bold)

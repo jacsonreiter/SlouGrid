@@ -14,7 +14,6 @@ struct TelaDoPersonagem: View {
                 magiasEquipadasBox
                 mensagemBox
                 botoesDeAcao
-                mochilaBox
                 botaoTrocarHeroi
             }
             .padding()
@@ -47,7 +46,7 @@ struct TelaDoPersonagem: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("\(vm.heroi.classe.rawValue) · Nível \(vm.heroi.nivel)")
+            Text("\(vm.heroi.classe.rawValue) · Nível \(vm.heroi.nivel)\(vm.heroi.cicloNewGamePlus > 0 ? " · Ciclo \(vm.heroi.cicloNewGamePlus)" : "")")
                 .font(.title3)
                 .foregroundColor(.secondary)
         }
@@ -76,6 +75,15 @@ struct TelaDoPersonagem: View {
                     .foregroundColor(.orange)
             }
             .font(.subheadline)
+
+            if vm.heroi.sequenciaDeExploracao > 0 {
+                HStack {
+                    Spacer()
+                    Label("Sequência \(vm.heroi.sequenciaDeExploracao) (+\(vm.heroi.bonusDeSequenciaPercentual)% Runas)", systemImage: "flame.fill")
+                        .foregroundColor(.orange)
+                }
+                .font(.caption)
+            }
         }
         .padding()
         .background(Color.gray.opacity(0.12))
@@ -98,7 +106,7 @@ struct TelaDoPersonagem: View {
         NavigationLink(destination: TelaDeEquipamento()) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Equipamento")
+                    Text("Personagem e Mochila")
                         .font(.headline)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -230,6 +238,9 @@ struct TelaDoPersonagem: View {
                 NavigationLink(destination: TelaDoMercado()) {
                     botao("Ir ao Mercado", cor: .purple, icone: "cart.fill")
                 }
+                NavigationLink(destination: TelaDaVila()) {
+                    botao("Ir à Vila", cor: .green, icone: "house.fill")
+                }
                 Button {
                     mensagem = descansarEDescrever()
                 } label: {
@@ -265,72 +276,6 @@ struct TelaDoPersonagem: View {
             .background(cor)
             .foregroundColor(.white)
             .cornerRadius(12)
-    }
-
-    var mochilaBox: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Mochila")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            if vm.heroi.inventario.isEmpty {
-                Text("Vazia")
-                    .foregroundColor(.secondary)
-            } else {
-                ForEach(vm.heroi.inventario) { pilha in
-                    linhaDaMochila(pilha)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.gray.opacity(0.08))
-        .cornerRadius(12)
-    }
-
-    func linhaDaMochila(_ pilha: PilhaDeItens) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                HStack(spacing: 6) {
-                    Text(pilha.item.nome)
-                    if pilha.quantidade > 1 {
-                        Text("x\(pilha.quantidade)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    Text(pilha.item.raridade.nome)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(pilha.item.raridade.cor.opacity(0.2))
-                        .foregroundColor(pilha.item.raridade.cor)
-                        .cornerRadius(6)
-                }
-                Text(pilha.item.descricao)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            if pilha.item.tipo == .pocao {
-                Button("Usar") {
-                    mensagem = vm.heroi.usarItem(pilha)
-                }
-                .foregroundColor(.green)
-            } else {
-                Button("Equipar") {
-                    mensagem = vm.heroi.equiparItem(pilha)
-                }
-                .foregroundColor(.blue)
-            }
-
-            Button("Vender") {
-                mensagem = vm.heroi.vender(pilha)
-            }
-            .foregroundColor(.red)
-        }
-        .padding(8)
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(8)
     }
 
     var botaoTrocarHeroi: some View {

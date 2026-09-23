@@ -46,6 +46,23 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles
 
+          # Diagnóstico de tamanho/formato só (nunca imprime o profile em si)
+          # — um .mobileprovision típico tem alguns KB; se vier vazio/muito
+          # pequeno, o segredo BUILD_PROVISION_PROFILE_BASE64 está errado.
+          echo "Provisioning profile decodificado: $(wc -c < "$PP_PATH") bytes"
+
+          # UUID do profile, pro Archive referenciar via PROVISIONING_PROFILE
+          # (assinatura manual, ver comentário no step Archive abaixo). Grava
+          # em arquivo em vez de pipe direto pro PlistBuddy, pra poder checar
+          # se o `security cms -D` (que decodifica o CMS/PKCS7 assinado pela
+          # Apple) realmente produziu algo antes de tentar ler o UUID dele.
+          PROFILE_PLIST="$RUNNER_TEMP/build_pp.plist"
+          security cms -D -i "$PP_PATH" -o "$PROFILE_PLIST"
+          echo "Profile plist decodificado: $(wc -c < "$PROFILE_PLIST") bytes"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
+          echo "Provisioning profile UUID: $PROFILE_UUID"
+          echo "PROVISIONING_PROFILE_UUID=$PROFILE_UUID" >> "$GITHUB_ENV"
+
       # A chave da App Store Connect API autentica o xcodebuild direto com a
       # Apple (renovar profile, e depois enviar o build) — sem precisar de
       # Apple ID + senha de app.
@@ -74,10 +91,19 @@ jobs:
           head -n 1 "$API_KEY_PATH"
           tail -n 1 "$API_KEY_PATH"
 
+      # O projeto usa CODE_SIGN_STYLE=Automatic sem CODE_SIGN_IDENTITY
+      # explícito em nenhuma configuração. Automatic sempre assina com a
+      # identidade de Desenvolvimento (é assim que a Apple projetou:
+      # distribuição só entra no passo de export) — por isso o run anterior
+      # falhou pedindo um certificado "iOS Development" que nunca foi
+      # importado (só o de Distribuição está no keychain deste runner).
+      # Forçar CODE_SIGN_IDENTITY="Apple Distribution" sem mudar o estilo
+      # também falha ("conflicting provisioning settings"), porque Automatic
+      # e uma identidade de Distribuição são incompatíveis entre si.
+      # Solução: assinatura manual só neste step, usando exatamente o
+      # certificado + profile já importados (nenhuma negociação com a Apple
+      # é necessária aqui — só o export/upload logo abaixo precisa da API key).
       - name: Archive
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
         run: |
           xcodebuild archive \
             -project SoulGrid.xcodeproj \
@@ -85,10 +111,9 @@ jobs:
             -configuration Release \
             -archivePath "$RUNNER_TEMP/SoulGrid.xcarchive" \
             -destination "generic/platform=iOS" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$API_KEY_PATH" \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID"
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROVISIONING_PROFILE_UUID"
 
       # exportArchive com destination=upload no ExportOptions.plist exporta
       # E envia pro App Store Connect num passo só.

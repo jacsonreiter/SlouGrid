@@ -6,16 +6,12 @@ struct TelaDeCadastro: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            Image(systemName: "person.crop.circle.fill")
+            Image("Logo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 90, height: 90)
-                .foregroundColor(.blue)
-
-            Text("Bem-vindo(a) ao Soul Grid")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
+                .frame(width: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
 
             Text("Como podemos te chamar?")
                 .font(.headline)

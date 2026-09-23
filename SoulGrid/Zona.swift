@@ -13,40 +13,187 @@ struct Zona: Identifiable {
     var iconeChefe: String
     var vitoriasParaChefe: Int = 3
 
-    func gerarInimigoComum(nivelHeroi: Int) -> Inimigo {
-        let nivel = max(nivelBaseInimigos, nivelHeroi)
-        let vida = 24 + nivel * 11
+    // Teto de quanto a zona escala pra cima do nível do herói — estilo
+    // Elden Ring: inimigos não escalam pra sempre com você, só "acompanham"
+    // até um limite. Sem isso, um herói bem acima do nível da zona nunca
+    // sentiria que superou o lugar (o próprio "power fantasy" de voltar a
+    // uma área antiga e arrasar nela desaparece); com o teto, passado esse
+    // ponto a zona fica pra trás de verdade, e a recompensa (que usa o
+    // mesmo `nivel`) também para de acompanhar — não compensa mais treinar
+    // ali.
+    private static let alcanceDeEscalaAcimaDaZona = 6
+
+    // New Game+ (ver `Personagem.cicloNewGamePlus`): +35% de vida/força/
+    // defesa/recompensa por ciclo, linear (não composto) de propósito —
+    // depois de vários ciclos o número continua alto mas nunca absurdo,
+    // já que o jogador pode iniciar quantos ciclos quiser em sequência.
+    // (Subiu de +25% pra +35%: testes mostraram o primeiro ciclo caindo
+    // fácil demais mesmo pra quem só jogou casualmente — precisava doer
+    // mais pra valer a pena como progressão de verdade.)
+    static func multiplicadorDeCiclo(_ ciclo: Int) -> Double {
+        1.0 + Double(ciclo) * 0.35
+    }
+
+    // Perfil elemental de cada zona (ver `ElementoDeDano`/`Magia.elemento`):
+    // positivo = resiste (dano reduzido), negativo = fraqueza (dano
+    // aumentado). Estilo os "Poder de defesa" por tipo do Elden Ring —
+    // adaptado pra que CADA zona recompense uma build diferente (fogo
+    // contra o pântano venenoso e a necrópole congelada; físico contra
+    // magia arcana entalhada na pedra; arcano contra armadura pesada),
+    // tornando "qual build eu levo pra essa masmorra" uma decisão real.
+    static func resistenciasDaZona(_ nome: String) -> [ElementoDeDano: Int] {
+        switch nome {
+        case "Floresta Sombria": return [.fisico: 15, .fogo: -20]
+        case "Pântano Nebuloso": return [.veneno: 40, .fogo: -20]
+        case "Cavernas de Pedra": return [.fisico: 25, .arcano: -20]
+        case "Necrópole Congelada": return [.gelo: 35, .fogo: -25]
+        case "Ruínas Antigas": return [.arcano: 30, .fisico: -15]
+        case "Fortaleza Abandonada": return [.fisico: 25, .arcano: -15]
+        case "Torre do Feiticeiro": return [.arcano: 25, .gelo: 15, .veneno: -20]
+        case "Abismo Estelar": return [.arcano: 25, .gelo: 20, .fogo: -25]
+        default: return [:]
+        }
+    }
+
+    // Rebalanceado depois de um playtest real mostrar que o jogo estava
+    // trivial de verdade: uma Bola de Fogo de nível 1 (sem cajado nenhum)
+    // fazia ~36 de dano contra um inimigo comum de nível 1 com só 35 de
+    // vida e 4 de defesa — ou seja, MATAVA COM UM CAST SÓ. O mesmo valia
+    // pro Guerreiro (Golpe Poderoso já quase zerava um inimigo sozinho) e
+    // pro Ladino. O problema nunca foi uma classe específica: era a
+    // fórmula de vida/defesa do inimigo comum, calibrada tempos atrás e
+    // nunca revalidada depois de todo o poder de dano que entrou na build
+    // (evolução de arma, magias novas, etc.) — daí "sem playtest real"
+    // sempre ter sido a ressalva nas notas de desenvolvimento.
+    //
+    // A correção segue a filosofia real de Dark Souls/Elden Ring: quando o
+    // dano do jogador cresce, o jogo não pune isso capando o dano — ele
+    // aumenta a vida/resistência do mundo (Margit tem muito mais vida que
+    // um soldado comum; NG+ deixa tudo mais tanque, não te deixa mais
+    // fraco). Vida quase triplicou na base e quase dobrou no coeficiente
+    // por nível; Defesa subiu de leve de novo (ainda existe especificamente
+    // pra não deixar burst mágico ignorar a resistência). O alvo calibrado
+    // à mão: um golpe/magia de abertura forte (não a magia mais fraca do
+    // grimório) deve precisar de 2-3 acertos pra derrubar um inimigo comum
+    // do MESMO nível — nunca 1, mas também sem virar uma maratona.
+    func gerarInimigoComum(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
+        let nivel = min(nivelBaseInimigos + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos, nivelHeroi))
+        let multiplicador = Zona.multiplicadorDeCiclo(cicloNewGamePlus)
+        let vida = Int(Double(45 + nivel * 22) * multiplicador)
         return Inimigo(
             nome: nomesInimigos.randomElement() ?? nome,
             icone: iconeInimigos,
             nivel: nivel,
             vidaMaxima: vida,
             vidaAtual: vida,
-            forca: 5 + nivel * 3,
-            defesa: 1 + nivel,
-            xpRecompensa: 14 + nivel * 7,
-            ouroRecompensa: (6 + nivel * 3)...(12 + nivel * 5),
+            forca: Int(Double(7 + nivel * 4) * multiplicador),
+            defesa: Int(Double(6 + nivel * 3) * multiplicador),
+            xpRecompensa: Int(Double(20 + nivel * 10) * multiplicador),
+            ouroRecompensa: Int(Double(9 + nivel * 4) * multiplicador)...Int(Double(17 + nivel * 7) * multiplicador),
             chefe: false,
-            zonaOrigem: nome
+            zonaOrigem: nome,
+            resistencias: Zona.resistenciasDaZona(nome)
         )
     }
 
-    func gerarChefe(nivelHeroi: Int) -> Inimigo {
-        let nivel = max(nivelBaseInimigos + 4, nivelHeroi + 2)
-        let vida = 70 + nivel * 18
+    // Mesma correção que `gerarInimigoComum` (ver comentário lá), aplicada
+    // proporcionalmente ao chefe: continua sendo o inimigo mais duro da
+    // zona por uma boa margem, não só um comum "inflado".
+    func gerarChefe(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
+        let nivel = min(nivelBaseInimigos + 4 + Zona.alcanceDeEscalaAcimaDaZona, max(nivelBaseInimigos + 4, nivelHeroi + 2))
+        let multiplicador = Zona.multiplicadorDeCiclo(cicloNewGamePlus)
+        let vida = Int(Double(130 + nivel * 34) * multiplicador)
         return Inimigo(
             nome: nomeChefe,
             icone: iconeChefe,
             nivel: nivel,
             vidaMaxima: vida,
             vidaAtual: vida,
-            forca: 10 + nivel * 4,
-            defesa: 4 + nivel * 2,
-            xpRecompensa: 120 + nivel * 14,
-            ouroRecompensa: (60 + nivel * 8)...(110 + nivel * 12),
+            forca: Int(Double(15 + nivel * 6) * multiplicador),
+            defesa: Int(Double(11 + nivel * 5) * multiplicador),
+            xpRecompensa: Int(Double(170 + nivel * 20) * multiplicador),
+            ouroRecompensa: Int(Double(85 + nivel * 12) * multiplicador)...Int(Double(150 + nivel * 16) * multiplicador),
             chefe: true,
-            zonaOrigem: nome
+            zonaOrigem: nome,
+            // Metade da magnitude do resto da zona: o chefe ainda tem a
+            // identidade elemental do lugar, mas sem travar a luta atrás de
+            // uma build específica — isso é papel do inimigo comum, que o
+            // jogador enfrenta várias vezes antes de aprender o padrão.
+            resistencias: Zona.resistenciasDaZona(nome).mapValues { $0 / 2 }
         )
+    }
+
+    // Grupo de inimigos comuns pra um único encontro — estilo os "camps" de
+    // Elden Ring, onde áreas mais avançadas colocam vários inimigos juntos
+    // em vez de só um mais forte. Quanto mais tardia a faixa da zona, maior
+    // a chance de enfrentar 2 ou até 3 de uma vez: o perigo real de um
+    // grupo não é a vida/força de cada um (que não mudou), é ter que
+    // dividir atenção enquanto todos os que ainda estão de pé atacam a
+    // cada turno.
+    func gerarGrupoComum(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> [Inimigo] {
+        (0..<Zona.tamanhoDoGrupo(nivelBaseInimigos: nivelBaseInimigos, cicloNewGamePlus: cicloNewGamePlus)).map { _ in
+            gerarInimigoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
+        }
+    }
+
+    private static func tamanhoDoGrupo(nivelBaseInimigos: Int, cicloNewGamePlus: Int = 0) -> Int {
+        // NG+ empurra a rolagem pra cima (sem nunca garantir o grupo
+        // máximo): cada ciclo é um mundo mais cheio de inimigos, não uma
+        // zona sempre lotada — mantém alguma variação mesmo em ciclos altos.
+        let viesDeNewGamePlus = min(30, cicloNewGamePlus * 8)
+        let rolagem = min(100, Int.random(in: 1...100) + viesDeNewGamePlus)
+        switch nivelBaseInimigos {
+        case ..<4: // Faixa 1
+            return rolagem <= 75 ? 1 : 2
+        case 4..<8: // Faixa 2
+            if rolagem <= 55 { return 1 }
+            if rolagem <= 95 { return 2 }
+            return 3
+        case 8..<13: // Faixa 3
+            if rolagem <= 40 { return 1 }
+            if rolagem <= 85 { return 2 }
+            return 3
+        default: // Faixa 4
+            if rolagem <= 25 { return 1 }
+            if rolagem <= 70 { return 2 }
+            return 3
+        }
+    }
+
+    // Um inimigo comum "inflado" para servir de field boss — mais vida,
+    // força e defesa que o normal da zona, com recompensa maior, mas sem
+    // contar pra vitórias do chefe nem dar Grande Rúnica.
+    func gerarInimigoDeElite(nivelHeroi: Int, cicloNewGamePlus: Int = 0) -> Inimigo {
+        var inimigo = gerarInimigoComum(nivelHeroi: nivelHeroi, cicloNewGamePlus: cicloNewGamePlus)
+        inimigo.nome = "\(inimigo.nome) de Elite"
+        inimigo.vidaMaxima = Int(Double(inimigo.vidaMaxima) * 1.6)
+        inimigo.vidaAtual = inimigo.vidaMaxima
+        inimigo.forca = Int(Double(inimigo.forca) * 1.3)
+        inimigo.defesa += 3
+        inimigo.xpRecompensa = Int(Double(inimigo.xpRecompensa) * 2.2)
+        inimigo.ouroRecompensa = (inimigo.ouroRecompensa.lowerBound * 2)...(inimigo.ouroRecompensa.upperBound * 2)
+        inimigo.elite = true
+        return inimigo
+    }
+}
+
+// O que a exploração de uma zona pode render, estilo o mapa aberto de Elden
+// Ring: na maior parte das vezes um inimigo comum, às vezes um "field boss"
+// de elite (mais forte, loot melhor), e ocasionalmente uma descoberta
+// pacífica — Runas/item de graça, sem risco de combate, como um cadáver ou
+// baú escondido no caminho.
+enum TipoDeEncontro {
+    case comum
+    case eliteDeCampo
+    case descoberta
+}
+
+extension Zona {
+    func sortearEncontro() -> TipoDeEncontro {
+        let rolagem = Int.random(in: 1...100)
+        if rolagem <= 8 { return .eliteDeCampo }
+        if rolagem <= 20 { return .descoberta }
+        return .comum
     }
 }
 
@@ -61,7 +208,7 @@ let zonasDoJogo: [Zona] = [
          icone: "leaf.fill",
          nivelMinimo: 1,
          nivelBaseInimigos: 1,
-         nomesInimigos: ["Lobo Selvagem", "Goblin Batedor", "Aranha Gigante"],
+         nomesInimigos: ["Lobo Selvagem", "Goblin Batedor", "Aranha Gigante", "Urso Tocado pelo Vazio", "Ent Sussurrante"],
          iconeInimigos: "pawprint.fill",
          nomeChefe: "Ent Corrompido",
          iconeChefe: "tree.fill"),
@@ -71,7 +218,7 @@ let zonasDoJogo: [Zona] = [
          icone: "cloud.fog.fill",
          nivelMinimo: 1,
          nivelBaseInimigos: 1,
-         nomesInimigos: ["Sapo Venenoso", "Vagalume Corrompido", "Ceifador de Lodo"],
+         nomesInimigos: ["Sapo Venenoso", "Vagalume Corrompido", "Ceifador de Lodo", "Sanguessuga do Vazio", "Bruxa do Brejo"],
          iconeInimigos: "ant.fill",
          nomeChefe: "Verme das Profundezas",
          iconeChefe: "tornado"),
@@ -82,7 +229,7 @@ let zonasDoJogo: [Zona] = [
          icone: "mountain.2.fill",
          nivelMinimo: 4,
          nivelBaseInimigos: 4,
-         nomesInimigos: ["Morcego Gigante", "Troll das Cavernas", "Esqueleto Guerreiro"],
+         nomesInimigos: ["Morcego Gigante", "Troll das Cavernas", "Esqueleto Guerreiro", "Aranha Cavernosa", "Anão Corrompido"],
          iconeInimigos: "tortoise.fill",
          nomeChefe: "Golem de Pedra",
          iconeChefe: "cube.fill"),
@@ -92,7 +239,7 @@ let zonasDoJogo: [Zona] = [
          icone: "snowflake",
          nivelMinimo: 4,
          nivelBaseInimigos: 4,
-         nomesInimigos: ["Zumbi Gélido", "Arauto da Geada", "Corvo Necromante"],
+         nomesInimigos: ["Zumbi Gélido", "Arauto da Geada", "Corvo Necromante", "Espectro Gélido", "Ceifador das Sombras"],
          iconeInimigos: "figure.walk",
          nomeChefe: "Cavaleiro Gélido",
          iconeChefe: "shield.righthalf.filled"),
@@ -103,7 +250,7 @@ let zonasDoJogo: [Zona] = [
          icone: "building.columns.fill",
          nivelMinimo: 8,
          nivelBaseInimigos: 8,
-         nomesInimigos: ["Guardião de Pedra", "Espectro Vingativo", "Cultista Sombrio"],
+         nomesInimigos: ["Guardião de Pedra", "Espectro Vingativo", "Cultista Sombrio", "Estátua Desperta", "Sacerdote Caído"],
          iconeInimigos: "flame.fill",
          nomeChefe: "Lich Ancestral",
          iconeChefe: "crown.fill"),
@@ -113,7 +260,7 @@ let zonasDoJogo: [Zona] = [
          icone: "building.2.fill",
          nivelMinimo: 8,
          nivelBaseInimigos: 8,
-         nomesInimigos: ["Sentinela Enferrujada", "Arqueiro Renegado", "Berserker Amaldiçoado"],
+         nomesInimigos: ["Sentinela Enferrujada", "Arqueiro Renegado", "Berserker Amaldiçoado", "Cão de Guerra Renegado", "Capitão Amaldiçoado"],
          iconeInimigos: "shield.slash.fill",
          nomeChefe: "General Caído",
          iconeChefe: "flag.checkered"),
@@ -124,7 +271,7 @@ let zonasDoJogo: [Zona] = [
          icone: "sparkles",
          nivelMinimo: 13,
          nivelBaseInimigos: 13,
-         nomesInimigos: ["Familiar Arcano", "Cavaleiro Amaldiçoado", "Elemental de Caos"],
+         nomesInimigos: ["Familiar Arcano", "Cavaleiro Amaldiçoado", "Elemental de Caos", "Grimório Vivo", "Espectro Arcano Instável"],
          iconeInimigos: "bolt.fill",
          nomeChefe: "Arquimago Caído",
          iconeChefe: "wand.and.stars"),
@@ -134,7 +281,7 @@ let zonasDoJogo: [Zona] = [
          icone: "moon.stars.fill",
          nivelMinimo: 13,
          nivelBaseInimigos: 13,
-         nomesInimigos: ["Aberração do Vazio", "Guardião Estelar", "Eco Sombrio"],
+         nomesInimigos: ["Aberração do Vazio", "Guardião Estelar", "Eco Sombrio", "Devorador Menor", "Fragmento Consciente"],
          iconeInimigos: "eye.fill",
          nomeChefe: "Devorador de Mundos",
          iconeChefe: "smallcircle.filled.circle.fill")

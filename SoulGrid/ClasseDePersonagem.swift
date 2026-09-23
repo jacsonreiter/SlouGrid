@@ -119,10 +119,11 @@ enum ClasseDePersonagem: String, Codable, CaseIterable, Identifiable {
     // MARK: - Crescimento por nível
 
     // Nenhum dos seis atributos cresce sozinho — todos vêm de pontos
-    // comprados diretamente com Runas (ver `Personagem.comprarPonto`), cada
-    // um subindo o nível em 1. O que cresce automaticamente é só a base "de
-    // nível" de Vida e do recurso da classe (equivalente ao Base Level do
-    // Ragnarok); o resto vem do investimento em Vitalidade/Inteligência.
+    // alocados e confirmados com Runas, estilo o menu de nível de Elden
+    // Ring (ver `Personagem.confirmarEvolucao`), cada um subindo o nível em
+    // 1. O que cresce automaticamente é só a base "de nível" de Vida e do
+    // recurso da classe (equivalente ao Base Level do Ragnarok); o resto
+    // vem do investimento em Vitalidade/Inteligência.
     var vidaBasePorNivel: Int {
         switch self {
         case .guerreiro: return 8

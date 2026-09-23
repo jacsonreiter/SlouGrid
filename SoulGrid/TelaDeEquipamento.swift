@@ -5,11 +5,25 @@ import SwiftUI
 struct TelaDeEquipamento: View {
     @EnvironmentObject var vm: GameViewModel
     @State private var mensagem = ""
+    // Pontos alocados nesta sessão de evolução, ainda não pagos nem
+    // aplicados — o "menu de nível" de Elden Ring: você distribui à vontade
+    // entre os atributos, vê o custo total subir, e só quando aperta
+    // Confirmar é que as Runas saem de verdade e o nível sobe. Sair da tela
+    // sem confirmar descarta a alocação, sem custo nenhum — como sair do
+    // menu de nível sem confirmar no jogo de referência.
+    @State private var alocacoes: [AtributoPrimario: Int] = [:]
+    // Aba da mochila (ver `mochilaBox`) — a mochila morava sozinha na tela
+    // inicial antes; juntar tudo aqui é o que torna a seta de upgrade
+    // (`indicadorDeUpgrade`) possível: comparar o que está na mochila com
+    // o que já está equipado só faz sentido quando as duas coisas estão
+    // na mesma tela.
+    @State private var abaMochila: AbaDaMochila = .pocoes
 
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 atributosBox
+                poderDoPersonagemBox
 
                 slotBox(titulo: "Arma", icone: "bolt.fill", item: vm.heroi.armaEquipada, tipo: .arma)
                 slotBox(titulo: "Armadura", icone: "shield.fill", item: vm.heroi.armaduraEquipada, tipo: .armadura)
@@ -26,19 +40,37 @@ struct TelaDeEquipamento: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                mochilaBox
             }
             .padding()
         }
-        .navigationTitle("Equipamento")
+        .navigationTitle("Personagem")
         .navigationBarTitleDisplayMode(.inline)
     }
 
     // MARK: - Atributos
 
-    // Estilo Elden Ring: escolha o atributo, veja o custo em Runas daquele
-    // ponto (sobe conforme o atributo já cresceu) e toque em "+" pra comprar
-    // na hora — sem um passo separado de "evoluir" antes de gastar. Cada
-    // ponto comprado (em qualquer atributo) também sobe o nível.
+    // Quantos pontos estão alocados (pendentes, não confirmados) no total.
+    var totalDePontosAlocados: Int {
+        alocacoes.values.reduce(0, +)
+    }
+
+    // Custo em Runas pra confirmar a alocação pendente inteira de uma vez —
+    // sobe conforme mais pontos são alocados nesta sessão, não conforme
+    // qual atributo é escolhido (ver `Personagem.custoTotal`).
+    var custoDaAlocacao: Int {
+        vm.heroi.custoTotal(pontosPendentes: totalDePontosAlocados)
+    }
+
+    var podeConfirmarEvolucao: Bool {
+        totalDePontosAlocados > 0 && vm.heroi.ouro >= custoDaAlocacao
+    }
+
+    // Estilo o menu de nível de Elden Ring: aloque pontos à vontade entre os
+    // atributos (o custo depende só de quantos pontos você já alocou no
+    // total, não de qual atributo), veja o custo total e o nível resultante,
+    // e confirme pra gastar as Runas e aplicar tudo de uma vez.
     var atributosBox: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -56,6 +88,10 @@ struct TelaDeEquipamento: View {
 
             ForEach(AtributoPrimario.allCases, id: \.self) { atributo in
                 linhaDeAtributoDistribuivel(atributo)
+            }
+
+            if totalDePontosAlocados > 0 {
+                confirmacaoDeEvolucaoBox
             }
 
             Divider().padding(.vertical, 2)
@@ -89,6 +125,92 @@ struct TelaDeEquipamento: View {
         .cornerRadius(12)
     }
 
+    // MARK: - Poder do Personagem (estilo o menu de status do Elden Ring:
+    // Poder Base/Poder de Ataque/Poder de Defesa)
+
+    // Três blocos separados — Poder Base (vida/recurso), Poder de Ataque
+    // (dano físico + cada elemento + crítico/acúmulo) e Poder de Defesa
+    // (defesa física + o preço dos talismãs de troca) — pra deixar claro
+    // exatamente o que cada arma/armadura/talismã equipado está somando
+    // no personagem, sem precisar adivinhar olhando pilha de descrições
+    // separadas em cada slot.
+    var poderDoPersonagemBox: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Poder do Personagem")
+                .font(.headline)
+            Text("O efeito real de cada arma, armadura e talismã equipado, tudo somado.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            poderBox(titulo: "Poder Base", icone: "person.fill", cor: .blue) {
+                linhaDePoder("Vida Máxima", vm.heroi.vidaMaxima)
+                linhaDePoder("\(vm.heroi.classe.nomeDoRecurso) Máximo", vm.heroi.energiaMaximaTotal)
+            }
+
+            poderBox(titulo: "Poder de Ataque", icone: "bolt.fill", cor: .red) {
+                linhaDePoderPercentual("Dano Físico", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .fisico))
+                linhaDePoderPercentual("Dano de Fogo", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .fogo))
+                linhaDePoderPercentual("Dano de Gelo", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .gelo))
+                linhaDePoderPercentual("Dano de Veneno", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .veneno))
+                linhaDePoderPercentual("Dano Arcano", vm.heroi.bonusDeDanoPercentualTotal(paraElemento: .arcano))
+                linhaDePoderPercentual("Potência de Magia (todo elemento)", vm.heroi.bonusPotenciaDeMagiaPercentualTotal)
+                linhaDePoderPercentual("Maestria da Arma Atual", vm.heroi.bonusDeMaestriaPercentual)
+                linhaDePoderPercentual("Dano Crítico", vm.heroi.bonusDanoCriticoPercentualTotal)
+                linhaDePoderPercentual("Acúmulo de Sangramento/Calafrio", vm.heroi.bonusAcumuloDeStatusPercentualTotal)
+            }
+
+            poderBox(titulo: "Poder de Defesa", icone: "shield.fill", cor: .cyan) {
+                linhaDePoder("Defesa Física", vm.heroi.defesaTotal)
+                if vm.heroi.reducaoDeDefesaPropriaPercentualTotal > 0 {
+                    linhaDePoderPercentual("Redução por Talismã de Troca", -vm.heroi.reducaoDeDefesaPropriaPercentualTotal)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.gray.opacity(0.12))
+        .cornerRadius(12)
+    }
+
+    @ViewBuilder
+    func poderBox<Conteudo: View>(titulo: String, icone: String, cor: Color, @ViewBuilder conteudo: () -> Conteudo) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(titulo, systemImage: icone)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(cor)
+            conteudo()
+        }
+        .padding(10)
+        .background(cor.opacity(0.08))
+        .cornerRadius(10)
+    }
+
+    func linhaDePoder(_ titulo: String, _ valor: Int) -> some View {
+        HStack {
+            Text(titulo).font(.caption).foregroundColor(.secondary)
+            Spacer()
+            Text("\(valor)").font(.caption).fontWeight(.semibold)
+        }
+    }
+
+    // Some linhas de % só aparecem quando diferentes de zero, pra não
+    // poluir a tela com uma fileira de "+0%" — só os efeitos que algum
+    // equipamento realmente está dando.
+    @ViewBuilder
+    func linhaDePoderPercentual(_ titulo: String, _ valor: Int) -> some View {
+        if valor != 0 {
+            HStack {
+                Text(titulo).font(.caption).foregroundColor(.secondary)
+                Spacer()
+                Text("\(valor > 0 ? "+" : "")\(valor)%")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(valor > 0 ? .green : .red)
+            }
+        }
+    }
+
     private func iconeDoAtributo(_ atributo: AtributoPrimario) -> (String, Color) {
         switch atributo {
         case .forca: return ("bolt.fill", .orange)
@@ -100,41 +222,99 @@ struct TelaDeEquipamento: View {
         }
     }
 
-    // Mostra o valor base do personagem, o quanto o equipamento contribui, e
-    // um botão que já mostra o custo em Runas do próximo ponto (sobe
-    // conforme o atributo cresce) e compra na hora ao tocar.
+    // Mostra o valor base do personagem, o bônus de equipamento, e quanto
+    // está alocado nesta sessão (ainda pendente) — com botões "-"/"+" pra
+    // ajustar a alocação. Nada é gasto até confirmar (ver `confirmacaoDeEvolucaoBox`).
     func linhaDeAtributoDistribuivel(_ atributo: AtributoPrimario) -> some View {
         let (icone, cor) = iconeDoAtributo(atributo)
         let base = vm.heroi.valor(de: atributo)
-        let total = vm.heroi.totalDe(atributo)
-        let custo = vm.heroi.custoEmRunas(de: atributo)
-        let podeComprar = vm.heroi.ouro >= custo
+        let bonusEquipamento = vm.heroi.totalDe(atributo) - base
+        let pendente = alocacoes[atributo] ?? 0
+        let totalComPendente = base + pendente + bonusEquipamento
+        let podeAlocarMais = base + pendente < Personagem.atributoMaximo
+            && vm.heroi.ouro >= vm.heroi.custoTotal(pontosPendentes: totalDePontosAlocados + 1)
 
         return HStack {
             Label(atributo.rawValue, systemImage: icone)
                 .foregroundColor(cor)
             Spacer()
-            if total != base {
+            Group {
                 Text("\(base) ")
                     .foregroundColor(.secondary)
-                + Text("+\(total - base) ")
-                    .foregroundColor(.green)
-                + Text("= \(total)")
-                    .fontWeight(.semibold)
-            } else {
-                Text("\(total)")
+                if pendente > 0 {
+                    Text("+\(pendente) ")
+                        .foregroundColor(.orange)
+                }
+                if bonusEquipamento != 0 {
+                    Text("+\(bonusEquipamento) ")
+                        .foregroundColor(.green)
+                }
+                Text("= \(totalComPendente)")
                     .fontWeight(.semibold)
             }
-            Button {
-                mensagem = vm.heroi.comprarPonto(em: atributo)
-            } label: {
-                Label("\(custo) Runas", systemImage: "plus.circle.fill")
-                    .font(.caption2)
+            .font(.subheadline)
+
+            HStack(spacing: 4) {
+                Button {
+                    alocacoes[atributo] = max(0, pendente - 1)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                }
+                .disabled(pendente <= 0)
+                .foregroundColor(pendente > 0 ? .red : .gray)
+
+                Button {
+                    alocacoes[atributo, default: 0] += 1
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                }
+                .disabled(!podeAlocarMais)
+                .foregroundColor(podeAlocarMais ? .green : .gray)
             }
-            .disabled(!podeComprar)
-            .foregroundColor(podeComprar ? .green : .gray)
+            .font(.title3)
         }
         .font(.subheadline)
+    }
+
+    // Barra de confirmação: aparece só quando há pontos pendentes — mostra
+    // o custo total, o nível que você teria depois, e os botões pra
+    // confirmar (gasta as Runas e aplica tudo) ou cancelar (descarta, sem
+    // custo nenhum).
+    var confirmacaoDeEvolucaoBox: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("\(totalDePontosAlocados) \(totalDePontosAlocados == 1 ? "ponto alocado" : "pontos alocados")")
+                    .font(.caption)
+                Spacer()
+                Text("Nível \(vm.heroi.nivel) → \(vm.heroi.nivelPrevisto(comPontosPendentes: totalDePontosAlocados))")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+            }
+            HStack {
+                Text("Custo total: \(custoDaAlocacao) Runas")
+                    .font(.caption)
+                    .foregroundColor(vm.heroi.ouro >= custoDaAlocacao ? .secondary : .red)
+                Spacer()
+                Button("Cancelar") {
+                    alocacoes = [:]
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+                Button("Confirmar") {
+                    mensagem = vm.heroi.confirmarEvolucao(alocacoes)
+                    alocacoes = [:]
+                }
+                .font(.caption)
+                .fontWeight(.bold)
+                .disabled(!podeConfirmarEvolucao)
+                .foregroundColor(podeConfirmarEvolucao ? .green : .gray)
+            }
+        }
+        .padding(8)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(8)
     }
 
     func linhaDeAtributoDerivado(_ nome: String, valor: Int, icone: String, cor: Color, sufixo: String = "") -> some View {
@@ -178,15 +358,28 @@ struct TelaDeEquipamento: View {
                                 .foregroundColor(item.raridade.cor)
                                 .cornerRadius(6)
                         }
-                        Text(item.bonus.descricaoCurta)
+                        Text(item.nivelDeEvolucao > 0 ? item.bonusEvoluido.descricaoCurta : item.bonus.descricaoCurta)
                             .font(.caption)
                             .foregroundColor(.secondary)
+                        if item.nivelDeEvolucao > 0 {
+                            Text("Forjado +\(item.nivelDeEvolucao)")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
                         // Ash of War: o Golpe de Arma da peça, só relevante
                         // para armas.
                         if tipo == .arma, let habilidade = item.habilidadeDeArma {
                             Label("\(habilidade.nome) (\(habilidade.custoEnergia) EN)", systemImage: habilidade.icone)
                                 .font(.caption)
                                 .foregroundColor(.indigo)
+                        }
+                        // Maestria (estilo Melvor Idle): sobe golpe a golpe
+                        // com essa arma equipada, nunca reseta ao trocar de
+                        // arma e voltar — recompensa dominar uma build.
+                        if tipo == .arma {
+                            Label("Maestria nível \(vm.heroi.nivelDeMaestriaArmaAtual)/\(Personagem.nivelMaximoDeMaestria) (+\(vm.heroi.bonusDeMaestriaPercentual)% dano)", systemImage: "star.fill")
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
                         }
                     }
                     Spacer()
@@ -353,6 +546,167 @@ struct TelaDeEquipamento: View {
         .foregroundColor(.primary)
         .padding(8)
         .background(Color.gray.opacity(0.08))
+        .cornerRadius(8)
+    }
+
+    // MARK: - Mochila
+
+    // Abas por tipo — a mochila listando tudo junto numa lista só ficava
+    // enorme depois de algumas horas de jogo. Mesmo padrão de
+    // `TelaDoMercado.AbaDoMercado`.
+    enum AbaDaMochila: String, CaseIterable {
+        case pocoes = "Poções"
+        case armas = "Armas"
+        case armaduras = "Armaduras"
+        case acessorios = "Acessórios"
+        case materiais = "Materiais"
+    }
+
+    var itensDaAbaMochila: [PilhaDeItens] {
+        vm.heroi.inventario.filter { pilha in
+            switch abaMochila {
+            case .pocoes: return pilha.item.tipo == .pocao
+            case .armas: return pilha.item.tipo == .arma
+            case .armaduras: return pilha.item.tipo == .armadura
+            case .acessorios: return pilha.item.tipo == .acessorio
+            case .materiais: return pilha.item.tipo == .material
+            }
+        }
+    }
+
+    var mochilaBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Mochila")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Picker("Aba", selection: $abaMochila) {
+                ForEach(AbaDaMochila.allCases, id: \.self) { aba in
+                    Text(aba.rawValue).tag(aba)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if vm.heroi.inventario.isEmpty {
+                Text("Vazia")
+                    .foregroundColor(.secondary)
+            } else if itensDaAbaMochila.isEmpty {
+                Text("Nada nessa aba ainda.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            } else {
+                ForEach(itensDaAbaMochila) { pilha in
+                    linhaDaMochila(pilha)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.gray.opacity(0.08))
+        .cornerRadius(12)
+    }
+
+    // Compara o item da pilha com o que já está equipado no mesmo slot
+    // (só faz sentido pra arma/armadura — acessório tem 3 slots e nem
+    // sempre um só "concorrente" óbvio, então não ganha seta). `nil` =
+    // nada equipado ainda nesse slot, e qualquer coisa é um upgrade sobre
+    // nada, então sempre mostra a seta verde.
+    func comparacaoComEquipado(_ item: Item) -> Int? {
+        switch item.tipo {
+        case .arma:
+            guard let equipada = vm.heroi.armaEquipada else { return nil }
+            return item.pontuacaoDeComparacao - equipada.pontuacaoDeComparacao
+        case .armadura:
+            guard let equipada = vm.heroi.armaduraEquipada else { return nil }
+            return item.pontuacaoDeComparacao - equipada.pontuacaoDeComparacao
+        default:
+            return nil
+        }
+    }
+
+    // Seta verde pra cima (melhor), vermelha pra baixo (pior) ou bolinha
+    // amarela (empate/neutro) — comparado com o que já está equipado no
+    // mesmo slot. Nada equipado ainda = seta verde direto (qualquer coisa
+    // já é melhor que nada).
+    @ViewBuilder
+    func indicadorDeUpgrade(_ pilha: PilhaDeItens) -> some View {
+        if pilha.item.tipo == .arma || pilha.item.tipo == .armadura {
+            let equipada = pilha.item.tipo == .arma ? vm.heroi.armaEquipada : vm.heroi.armaduraEquipada
+            if equipada == nil {
+                Image(systemName: "arrow.up.circle.fill").foregroundColor(.green)
+            } else {
+                let diferenca = comparacaoComEquipado(pilha.item) ?? 0
+                if diferenca > 0 {
+                    Image(systemName: "arrow.up.circle.fill").foregroundColor(.green)
+                } else if diferenca < 0 {
+                    Image(systemName: "arrow.down.circle.fill").foregroundColor(.red)
+                } else {
+                    Image(systemName: "circle.fill").font(.caption2).foregroundColor(.yellow)
+                }
+            }
+        }
+    }
+
+    func linhaDaMochila(_ pilha: PilhaDeItens) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                HStack(spacing: 6) {
+                    indicadorDeUpgrade(pilha)
+                    Text(pilha.item.nome)
+                    if pilha.quantidade > 1 {
+                        Text("x\(pilha.quantidade)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Text(pilha.item.raridade.nome)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(pilha.item.raridade.cor.opacity(0.2))
+                        .foregroundColor(pilha.item.raridade.cor)
+                        .cornerRadius(6)
+                }
+                Text(pilha.item.descricao)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            if pilha.item.tipo == .pocao {
+                if pilha.item.efeitoDePocao == .fortalecimento {
+                    // Poção de buff: só tem efeito em combate (mexe no
+                    // estado temporário de `TelaDeCombate`), então não
+                    // oferece "Usar" aqui pra não desperdiçar o item à toa.
+                    Text("Use em combate")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Button("Usar") {
+                        mensagem = vm.heroi.usarItem(pilha)
+                    }
+                    .foregroundColor(.green)
+                }
+            } else if pilha.item.tipo == .material {
+                // Material de missão/Forja/comércio: não equipa nem se
+                // "usa" — só entrega em missões ou reforça equipamento na
+                // Forja (ambos na Vila), ou vende aqui.
+                Text("Forja, missão ou venda")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else {
+                Button("Equipar") {
+                    mensagem = vm.heroi.equiparItem(pilha)
+                }
+                .foregroundColor(.blue)
+            }
+
+            Button("Vender") {
+                mensagem = vm.heroi.vender(pilha)
+            }
+            .foregroundColor(.red)
+        }
+        .padding(8)
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
     }
 }
