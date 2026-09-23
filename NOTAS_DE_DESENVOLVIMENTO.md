@@ -1435,3 +1435,22 @@ teto ao mesmo tempo, o que é o trade-off esperado de um build híbrido,
 não um bug). Balanceamento de chaves/parênteses + auditoria de ordem de
 argumentos, sem regressão. Sem playtest real de novo — o próximo teste
 valida se os novos patamares "sentem" bem em jogo.
+
+## Kael (Forja) sempre visível na Vila, não mais trancado até o nível 20 (mesma sessão)
+
+Bug de UX real reportado: Kael só aparecia na Vila a partir do nível 20
+(`PNJ.nivelMinimoParaAparecer`), e como a Forja mora dentro do card
+dele (`TelaDeEquipamento.forjaBox`, via `TelaDaVila`), isso trancava a
+evolução de arma/armadura inteira até lá — ninguém conseguia gastar
+Pedra de Forja nenhuma antes do nível 20, mesmo já tendo caçado uma
+pilha delas.
+
+Corrigido só mudando `nivelMinimoParaAparecer` de Kael pra `1` — as
+missões dele continuam presas ao nível 20 por conta própria
+(`Missao.nivelMinimo: 20`, checado direto em `Personagem.
+statusDaMissao`, independente de o card do PNJ estar visível ou não),
+então elas continuam aparecendo como "Bloqueada" e destravam sozinhas
+quando o nível chega. Confirmado por leitura de `statusDaMissao`: o
+gate de nível já era por missão, nunca dependeu do PNJ estar visível —
+então essa era a única mudança necessária, sem risco de destravar as
+missões de Kael cedo demais.

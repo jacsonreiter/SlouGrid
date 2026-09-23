@@ -9,11 +9,13 @@ struct PNJ: Identifiable {
     var titulo: String
     var icone: String
     var fala: String
-    // Nível do herói pra esse morador aparecer na Vila — os 4 novos
-    // (Oriana/Kael/Ithra + o retorno de Toren no fim) só se mostram a
-    // cada marco de 10 níveis, como pedido: "a cada 10 níveis aparecem
-    // NPCs novos". Os guias de zona aparecem no mesmo nível em que a
-    // zona deles desbloqueia (ver `Zona.nivelMinimo`).
+    // Nível do herói pra esse morador aparecer na Vila — Oriana/Ithra e o
+    // retorno de Toren no fim só se mostram a cada marco de 10 níveis,
+    // como pedido: "a cada 10 níveis aparecem NPCs novos". Os guias de
+    // zona aparecem no mesmo nível em que a zona deles desbloqueia (ver
+    // `Zona.nivelMinimo`). Kael é a exceção: fica sempre visível desde o
+    // nível 1, porque a Forja não pode ficar trancada (ver o card dele,
+    // logo abaixo) — só as missões dele continuam presas ao nível 20.
     var nivelMinimoParaAparecer: Int = 1
 
     var missoes: [Missao] {
@@ -47,10 +49,18 @@ extension PNJ {
             icone: "shield.checkered",
             fala: "As criaturas lá fora estão mudando. Mais ferozes. Mais... erradas. Me ajude a entender o que está acontecendo.",
             nivelMinimoParaAparecer: 10),
+        // Kael aparece desde o nível 1 — a Forja (ver `TelaDeEquipamento.
+        // forjaBox`) não pode ficar trancada atrás de um nível específico,
+        // senão o jogador não tem onde evoluir arma/armadura até lá. As
+        // missões dele continuam trancadas até o nível certo por conta
+        // própria (`Missao.nivelMinimo: 20`, checado em
+        // `Personagem.statusDaMissao`), então elas aparecem como
+        // "Bloqueada" e destravam sozinhas quando o nível chega — só o
+        // card do PNJ (e a Forja) não fica mais escondido até lá.
         PNJ(id: "kael", nome: "Kael, o Ferreiro", titulo: "Mestre Ferreiro da Vila",
             icone: "hammer.fill",
             fala: "Traga material raro o bastante e eu forjo qualquer coisa. Já vi metais estranhos ultimamente... vindos de longe.",
-            nivelMinimoParaAparecer: 20),
+            nivelMinimoParaAparecer: 1),
         PNJ(id: "ithra", nome: "Ithra, a Vidente", titulo: "Oráculo da Vila",
             icone: "eye.trianglebadge.exclamationmark.fill",
             fala: "Eu vejo fragmentos do que está por vir. Nem tudo é claro... mas sei que você tem um papel nisso.",
