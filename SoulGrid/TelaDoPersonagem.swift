@@ -4,7 +4,6 @@ struct TelaDoPersonagem: View {
     @EnvironmentObject var vm: GameViewModel
     @State private var mensagem = "Bem-vindo(a) de volta, aventureiro(a)!"
     @State private var slotSelecionado: Int? = nil
-    @State private var abaMochila: AbaDaMochila = .pocoes
 
     var body: some View {
         ScrollView {
@@ -15,7 +14,6 @@ struct TelaDoPersonagem: View {
                 magiasEquipadasBox
                 mensagemBox
                 botoesDeAcao
-                mochilaBox
                 botaoTrocarHeroi
             }
             .padding()
@@ -108,7 +106,7 @@ struct TelaDoPersonagem: View {
         NavigationLink(destination: TelaDeEquipamento()) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Equipamento")
+                    Text("Personagem e Mochila")
                         .font(.headline)
                     Spacer()
                     Image(systemName: "chevron.right")
@@ -278,123 +276,6 @@ struct TelaDoPersonagem: View {
             .background(cor)
             .foregroundColor(.white)
             .cornerRadius(12)
-    }
-
-    // Abas por tipo — antes a mochila listava tudo junto numa lista só,
-    // que ficava enorme depois de algumas horas de jogo. Mesmo padrão de
-    // `TelaDoMercado.AbaDoMercado`.
-    enum AbaDaMochila: String, CaseIterable {
-        case pocoes = "Poções"
-        case armas = "Armas"
-        case armaduras = "Armaduras"
-        case acessorios = "Acessórios"
-        case materiais = "Materiais"
-    }
-
-    var itensDaAbaMochila: [PilhaDeItens] {
-        vm.heroi.inventario.filter { pilha in
-            switch abaMochila {
-            case .pocoes: return pilha.item.tipo == .pocao
-            case .armas: return pilha.item.tipo == .arma
-            case .armaduras: return pilha.item.tipo == .armadura
-            case .acessorios: return pilha.item.tipo == .acessorio
-            case .materiais: return pilha.item.tipo == .material
-            }
-        }
-    }
-
-    var mochilaBox: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Mochila")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Picker("Aba", selection: $abaMochila) {
-                ForEach(AbaDaMochila.allCases, id: \.self) { aba in
-                    Text(aba.rawValue).tag(aba)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            if vm.heroi.inventario.isEmpty {
-                Text("Vazia")
-                    .foregroundColor(.secondary)
-            } else if itensDaAbaMochila.isEmpty {
-                Text("Nada nessa aba ainda.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.top, 4)
-            } else {
-                ForEach(itensDaAbaMochila) { pilha in
-                    linhaDaMochila(pilha)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.gray.opacity(0.08))
-        .cornerRadius(12)
-    }
-
-    func linhaDaMochila(_ pilha: PilhaDeItens) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                HStack(spacing: 6) {
-                    Text(pilha.item.nome)
-                    if pilha.quantidade > 1 {
-                        Text("x\(pilha.quantidade)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    Text(pilha.item.raridade.nome)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(pilha.item.raridade.cor.opacity(0.2))
-                        .foregroundColor(pilha.item.raridade.cor)
-                        .cornerRadius(6)
-                }
-                Text(pilha.item.descricao)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            Spacer()
-            if pilha.item.tipo == .pocao {
-                if pilha.item.efeitoDePocao == .fortalecimento {
-                    // Poção de buff: só tem efeito em combate (mexe no
-                    // estado temporário de `TelaDeCombate`), então não
-                    // oferece "Usar" aqui pra não desperdiçar o item à toa.
-                    Text("Use em combate")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                } else {
-                    Button("Usar") {
-                        mensagem = vm.heroi.usarItem(pilha)
-                    }
-                    .foregroundColor(.green)
-                }
-            } else if pilha.item.tipo == .material {
-                // Material de missão/Forja/comércio: não equipa nem se
-                // "usa" — só entrega em missões ou reforça equipamento na
-                // Forja (ambos na Vila), ou vende aqui.
-                Text("Forja, missão ou venda")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            } else {
-                Button("Equipar") {
-                    mensagem = vm.heroi.equiparItem(pilha)
-                }
-                .foregroundColor(.blue)
-            }
-
-            Button("Vender") {
-                mensagem = vm.heroi.vender(pilha)
-            }
-            .foregroundColor(.red)
-        }
-        .padding(8)
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(8)
     }
 
     var botaoTrocarHeroi: some View {

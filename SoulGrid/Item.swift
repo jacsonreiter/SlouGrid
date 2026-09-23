@@ -208,6 +208,22 @@ struct Item: Codable, Identifiable {
         return escalado
     }
 
+    // Pontuação agregada só pra comparar "esse item é melhor que o que já
+    // equipo?" na mochila (ver seta de upgrade em `TelaDeEquipamento`) —
+    // nunca usada no cálculo de dano/defesa de combate de verdade (que já
+    // soma cada atributo separadamente, ver `Personagem.bonusAtivos`).
+    // Pesa os efeitos de talismã um pouco mais alto (regen/ouro/chance de
+    // item custam um slot inteiro sem dar atributo de combate nenhum,
+    // então valem mais por ponto do que parecem à primeira vista) e
+    // ignora Golpe de Arma/efeito de buff de propósito — "qual efeito é
+    // melhor" é subjetivo demais pra virar seta verde/vermelha.
+    var pontuacaoDeComparacao: Int {
+        let b = bonusEvoluido
+        return b.forca + b.vitalidade + b.inteligencia + b.destreza + b.agilidade + b.sorte + b.defesa + b.energia
+            + b.regenVidaPorTurno * 3 + b.regenEnergiaPorTurno * 3
+            + b.bonusOuroPercentual / 2 + b.bonusChanceDeItemPercentual / 2 + b.bonusRaridadeDeItem * 5
+    }
+
     var descricao: String {
         switch tipo {
         case .pocao:

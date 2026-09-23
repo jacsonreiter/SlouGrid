@@ -1326,3 +1326,41 @@ total** — não 1,69 bilhão como no jogo original (a economia deste jogo
 é bem menor em escala absoluta), mas a MESMA relação: barato pra jogar
 a campanha normal, uma fortuna desproporcional pra chegar no hard cap
 de verdade.
+
+## Seta de upgrade na mochila + Mochila unificada com Equipamento (mesma sessão)
+
+Feedback de UX depois de mais uma rodada de teste: ficava difícil
+comparar o que tem na mochila com o que já está equipado (a mochila
+morava na tela inicial, o Equipamento era outra tela separada). Pedido:
+uma seta verde/vermelha (ou bolinha neutra) indicando se um item da
+mochila é melhor, pior ou igual ao que já está equipado, e avaliar se
+valia a pena juntar Mochila dentro de Equipamento, renomeando pra
+"Personagem".
+
+- **`Item.pontuacaoDeComparacao`**: soma simples dos atributos do
+  `bonusEvoluido` (pesando talismã de regen/ouro/chance de item um
+  pouco mais alto, já que ocupam um slot inteiro sem dar atributo de
+  combate nenhum) — só serve pra comparar "esse item é melhor?", nunca
+  entra no cálculo de dano/defesa real do combate.
+- **`TelaDeEquipamento.indicadorDeUpgrade`**: seta verde (`arrow.up`)
+  se a pontuação da peça na mochila for maior que a equipada no mesmo
+  slot, vermelha (`arrow.down`) se for menor, bolinha amarela se
+  empatar — só pra arma/armadura (acessório tem 3 slots concorrentes,
+  não dá pra comparar com "o" equipado). Nada equipado ainda = sempre
+  verde (qualquer coisa é melhor que nada).
+- **Mochila unificada**: `AbaDaMochila`/`itensDaAbaMochila`/
+  `mochilaBox`/`linhaDaMochila` saíram de `TelaDoPersonagem` (a tela
+  inicial) e foram pra dentro de `TelaDeEquipamento`, que também
+  ganhou o título "Personagem" (era "Equipamento"). A tela inicial
+  ficou mais enxuta (cabeçalho, status, o card que agora leva direto
+  pra "Personagem e Mochila", magias equipadas, ações, trocar herói) —
+  e a seta de upgrade só fazia sentido de verdade com as duas coisas
+  juntas na mesma tela.
+
+Validado por balanceamento de chaves/parênteses/colchetes + auditoria
+de ordem de argumentos em todos os arquivos, e grep pra confirmar que
+nenhuma referência a `AbaDaMochila`/`mochilaBox`/`linhaDaMochila`
+ficou pra trás na tela antiga depois da mudança. Sem playtest real —
+próximo teste do usuário valida se a pontuação de comparação bate com
+a intuição dele (ela ignora Golpe de Arma/efeito de buff de propósito,
+que são subjetivos demais pra virar seta).

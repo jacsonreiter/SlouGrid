@@ -12,6 +12,12 @@ struct TelaDeEquipamento: View {
     // sem confirmar descarta a alocação, sem custo nenhum — como sair do
     // menu de nível sem confirmar no jogo de referência.
     @State private var alocacoes: [AtributoPrimario: Int] = [:]
+    // Aba da mochila (ver `mochilaBox`) — a mochila morava sozinha na tela
+    // inicial antes; juntar tudo aqui é o que torna a seta de upgrade
+    // (`indicadorDeUpgrade`) possível: comparar o que está na mochila com
+    // o que já está equipado só faz sentido quando as duas coisas estão
+    // na mesma tela.
+    @State private var abaMochila: AbaDaMochila = .pocoes
 
     var body: some View {
         ScrollView {
@@ -33,10 +39,12 @@ struct TelaDeEquipamento: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+
+                mochilaBox
             }
             .padding()
         }
-        .navigationTitle("Equipamento")
+        .navigationTitle("Personagem")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -451,6 +459,167 @@ struct TelaDeEquipamento: View {
         .foregroundColor(.primary)
         .padding(8)
         .background(Color.gray.opacity(0.08))
+        .cornerRadius(8)
+    }
+
+    // MARK: - Mochila
+
+    // Abas por tipo — a mochila listando tudo junto numa lista só ficava
+    // enorme depois de algumas horas de jogo. Mesmo padrão de
+    // `TelaDoMercado.AbaDoMercado`.
+    enum AbaDaMochila: String, CaseIterable {
+        case pocoes = "Poções"
+        case armas = "Armas"
+        case armaduras = "Armaduras"
+        case acessorios = "Acessórios"
+        case materiais = "Materiais"
+    }
+
+    var itensDaAbaMochila: [PilhaDeItens] {
+        vm.heroi.inventario.filter { pilha in
+            switch abaMochila {
+            case .pocoes: return pilha.item.tipo == .pocao
+            case .armas: return pilha.item.tipo == .arma
+            case .armaduras: return pilha.item.tipo == .armadura
+            case .acessorios: return pilha.item.tipo == .acessorio
+            case .materiais: return pilha.item.tipo == .material
+            }
+        }
+    }
+
+    var mochilaBox: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Mochila")
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Picker("Aba", selection: $abaMochila) {
+                ForEach(AbaDaMochila.allCases, id: \.self) { aba in
+                    Text(aba.rawValue).tag(aba)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if vm.heroi.inventario.isEmpty {
+                Text("Vazia")
+                    .foregroundColor(.secondary)
+            } else if itensDaAbaMochila.isEmpty {
+                Text("Nada nessa aba ainda.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+            } else {
+                ForEach(itensDaAbaMochila) { pilha in
+                    linhaDaMochila(pilha)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.gray.opacity(0.08))
+        .cornerRadius(12)
+    }
+
+    // Compara o item da pilha com o que já está equipado no mesmo slot
+    // (só faz sentido pra arma/armadura — acessório tem 3 slots e nem
+    // sempre um só "concorrente" óbvio, então não ganha seta). `nil` =
+    // nada equipado ainda nesse slot, e qualquer coisa é um upgrade sobre
+    // nada, então sempre mostra a seta verde.
+    func comparacaoComEquipado(_ item: Item) -> Int? {
+        switch item.tipo {
+        case .arma:
+            guard let equipada = vm.heroi.armaEquipada else { return nil }
+            return item.pontuacaoDeComparacao - equipada.pontuacaoDeComparacao
+        case .armadura:
+            guard let equipada = vm.heroi.armaduraEquipada else { return nil }
+            return item.pontuacaoDeComparacao - equipada.pontuacaoDeComparacao
+        default:
+            return nil
+        }
+    }
+
+    // Seta verde pra cima (melhor), vermelha pra baixo (pior) ou bolinha
+    // amarela (empate/neutro) — comparado com o que já está equipado no
+    // mesmo slot. Nada equipado ainda = seta verde direto (qualquer coisa
+    // já é melhor que nada).
+    @ViewBuilder
+    func indicadorDeUpgrade(_ pilha: PilhaDeItens) -> some View {
+        if pilha.item.tipo == .arma || pilha.item.tipo == .armadura {
+            let equipada = pilha.item.tipo == .arma ? vm.heroi.armaEquipada : vm.heroi.armaduraEquipada
+            if equipada == nil {
+                Image(systemName: "arrow.up.circle.fill").foregroundColor(.green)
+            } else {
+                let diferenca = comparacaoComEquipado(pilha.item) ?? 0
+                if diferenca > 0 {
+                    Image(systemName: "arrow.up.circle.fill").foregroundColor(.green)
+                } else if diferenca < 0 {
+                    Image(systemName: "arrow.down.circle.fill").foregroundColor(.red)
+                } else {
+                    Image(systemName: "circle.fill").font(.caption2).foregroundColor(.yellow)
+                }
+            }
+        }
+    }
+
+    func linhaDaMochila(_ pilha: PilhaDeItens) -> some View {
+        HStack {
+            VStack(alignment: .leading) {
+                HStack(spacing: 6) {
+                    indicadorDeUpgrade(pilha)
+                    Text(pilha.item.nome)
+                    if pilha.quantidade > 1 {
+                        Text("x\(pilha.quantidade)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Text(pilha.item.raridade.nome)
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(pilha.item.raridade.cor.opacity(0.2))
+                        .foregroundColor(pilha.item.raridade.cor)
+                        .cornerRadius(6)
+                }
+                Text(pilha.item.descricao)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            if pilha.item.tipo == .pocao {
+                if pilha.item.efeitoDePocao == .fortalecimento {
+                    // Poção de buff: só tem efeito em combate (mexe no
+                    // estado temporário de `TelaDeCombate`), então não
+                    // oferece "Usar" aqui pra não desperdiçar o item à toa.
+                    Text("Use em combate")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                } else {
+                    Button("Usar") {
+                        mensagem = vm.heroi.usarItem(pilha)
+                    }
+                    .foregroundColor(.green)
+                }
+            } else if pilha.item.tipo == .material {
+                // Material de missão/Forja/comércio: não equipa nem se
+                // "usa" — só entrega em missões ou reforça equipamento na
+                // Forja (ambos na Vila), ou vende aqui.
+                Text("Forja, missão ou venda")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            } else {
+                Button("Equipar") {
+                    mensagem = vm.heroi.equiparItem(pilha)
+                }
+                .foregroundColor(.blue)
+            }
+
+            Button("Vender") {
+                mensagem = vm.heroi.vender(pilha)
+            }
+            .foregroundColor(.red)
+        }
+        .padding(8)
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
     }
 }
